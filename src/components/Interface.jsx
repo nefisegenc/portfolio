@@ -13,7 +13,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Joystick } from "./Joystick";
 
 // Typewriter hint message
-const HINT_MESSAGE = "Tablolara doğru ilerleyerek projelerimi keşfet...";
+const HINT_MESSAGE = "Walk towards the paintings to discover my projects...";
 
 export const Interface = () => {
     const { currentProject, closeProject, bioOpen, setBioOpen } = useStore();

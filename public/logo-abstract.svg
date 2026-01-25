@@ -1,0 +1,46 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#bd00ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00eaff;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Outer Hexagon -->
+  <path d="M32 4 L58 19 V45 L32 60 L6 45 V19 Z" 
+        stroke="url(#grad)" 
+        stroke-width="3" 
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        filter="url(#glow)" />
+        
+  <!-- Inner Triangle Up -->
+  <path d="M32 14 L49 44 H15 Z" 
+        stroke="#bd00ff" 
+        stroke-width="2" 
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        filter="url(#glow)" 
+        fill-opacity="0.1"
+        fill="#bd00ff"/>
+
+  <!-- Inner Triangle Down -->
+  <path d="M32 50 L15 20 H49 Z" 
+        stroke="#00eaff" 
+        stroke-width="2" 
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        filter="url(#glow)"
+        fill-opacity="0.1"
+        fill="#00eaff" />
+        
+  <!-- Center Dot -->
+  <circle cx="32" cy="32" r="4" fill="white" filter="url(#glow)" />
+</svg>
