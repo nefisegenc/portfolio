@@ -110,16 +110,16 @@ export const Interface = () => {
             {/* Project Modal */}
             {currentProject && (
                 <div
-                    className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-auto backdrop-blur-sm overflow-y-auto py-8"
+                    className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-auto backdrop-blur-sm p-4"
                     onClick={() => closeProject()}
                 >
                     <div
-                        className="bg-gray-900 border border-gray-700 p-8 rounded-lg max-w-4xl w-full shadow-2xl mx-4"
+                        className="bg-gray-900 border border-gray-700 p-4 md:p-8 rounded-lg max-w-4xl w-full shadow-2xl overflow-y-auto max-h-[90vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex flex-col gap-6">
                             {/* Header */}
-                            <div className="flex justify-between items-start">
+                            <div className="flex justify-between items-start sticky top-0 bg-gray-900/95 backdrop-blur z-10 pb-4 border-b border-gray-800">
                                 <div>
                                     <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
                                         {currentProject.title}
@@ -127,10 +127,13 @@ export const Interface = () => {
                                     <p className="text-gray-400 mt-2">{currentProject.year} | {currentProject.role}</p>
                                 </div>
                                 <button
-                                    className="text-gray-400 hover:text-white transition-colors text-sm"
+                                    className="text-gray-400 hover:text-white transition-colors p-2"
                                     onClick={() => closeProject()}
                                 >
-                                    CLOSE [X]
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
                                 </button>
                             </div>
 
@@ -243,9 +246,9 @@ export const Interface = () => {
                                     )}
                                 </div>
                             ) : (
-                                <div className="flex gap-8">
+                                <div className="flex flex-col md:flex-row gap-6 md:gap-8">
                                     {/* Left: Image (Standard Layout) */}
-                                    <div className="w-2/5 flex-shrink-0 flex flex-col gap-4">
+                                    <div className="w-full md:w-2/5 flex-shrink-0 flex flex-col gap-4">
                                         <div className="aspect-video bg-black/50 rounded-lg overflow-hidden flex items-center justify-center p-2">
                                             <img
                                                 src={currentProject.modalImage || currentProject.image}
@@ -266,16 +269,16 @@ export const Interface = () => {
                                     </div>
 
                                     {/* Right: Content (Standard Layout) */}
-                                    <div className="w-3/5 text-gray-300 space-y-6">
+                                    <div className="w-full md:w-3/5 text-gray-300 space-y-6">
                                         {/* Description */}
                                         <div className="bg-gray-800/50 p-6 rounded-lg">
-                                            <p className="leading-relaxed text-lg">{currentProject.description}</p>
+                                            <p className="leading-relaxed text-sm md:text-lg">{currentProject.description}</p>
                                         </div>
 
                                         {/* Original Features & Tech display code... will be preserved by standardizing the else block */}
                                         {/* To keep the diff clean and minimal, I will rewrite the existing structure carefully */}
 
-                                        <div className="grid grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div>
                                                 <h3 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
                                                     <span className="w-1 h-6 bg-purple-500 rounded-full"></span>
@@ -446,10 +449,13 @@ export const Interface = () => {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
-                            className="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors"
+                            className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors p-2 z-10"
                             onClick={() => setBioOpen(false)}
                         >
-                            CLOSE [X]
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
                         </button>
 
                         <div className="space-y-6">
