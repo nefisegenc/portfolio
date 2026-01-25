@@ -360,8 +360,9 @@ export const Interface = () => {
                         </div>
 
                         {/* Mobile Hint */}
-                        <div className="md:hidden text-cyan-400 mb-2 font-mono text-sm border border-cyan-500/30 rounded p-2 bg-cyan-900/20">
-                            USE ARROWS TO MOVE
+                        <div className="md:hidden absolute top-[-150px] left-1/2 -translate-x-1/2 w-[200px] text-cyan-400 mb-2 font-mono text-sm border border-cyan-500/30 rounded p-2 bg-cyan-900/80 backdrop-blur-md">
+                            USE JOYSTICK TO MOVE<br />
+                            DRAG SCREEN TO LOOK
                         </div>
 
                         {/* Typewriter text */}
