@@ -193,8 +193,8 @@ export const personalInfo = {
     email: "nefisenurgenc@gmail.com",
     phone: "+90 533 514 87 77",
     location: "Istanbul, Turkey",
-    linkedin: "https://linkedin.com/in/nefisenurgenc",
-    github: "https://github.com/nefisenurgenc",
+    linkedin: "https://www.linkedin.com/in/nefise-gen%C3%A7-67ba66226/",
+    github: "https://github.com/nefisegenc",
     about: "I'm a front-end developer skilled in React, JavaScript, HTML, and CSS. I create user-friendly and responsive interfaces, with strong problem-solving abilities backed by experience in project management.",
     skills: {
         programming: ["React.js", "Next.js", "TypeScript", "HTML", "CSS", "SQL", "Python"],

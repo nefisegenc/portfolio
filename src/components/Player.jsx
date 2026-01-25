@@ -75,11 +75,23 @@ export const Player = () => {
     // Touch handlers for trackpad/mobile
     const handleTouchStart = (e) => {
         touchCount.current = e.touches.length;
-        if (e.touches.length === 2) {
-            // Two finger touch - use for camera rotation
-            const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-            const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-            lastTouchPos.current = { x: centerX, y: centerY };
+
+        // Ignore touches on buttons (Joystick etc.)
+        if (e.target.closest('button')) return;
+
+        if (e.touches.length === 1 || e.touches.length === 2) {
+            // Use center of touches for 2 fingers, or just the one finger
+            let startX, startY;
+
+            if (e.touches.length === 2) {
+                startX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                startY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            } else {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }
+
+            lastTouchPos.current = { x: startX, y: startY };
             setIsDragging(true);
         }
     };
@@ -88,12 +100,19 @@ export const Player = () => {
         // Disable rotation if About modal or Project modal is open
         if (useStore.getState().bioOpen || useStore.getState().currentProject) return;
 
-        if (e.touches.length === 2 && isDragging) {
-            const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-            const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        if (isDragging && (e.touches.length === 1 || e.touches.length === 2)) {
+            let currentX, currentY;
 
-            const deltaX = centerX - lastTouchPos.current.x;
-            const deltaY = centerY - lastTouchPos.current.y;
+            if (e.touches.length === 2) {
+                currentX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                currentY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            } else {
+                currentX = e.touches[0].clientX;
+                currentY = e.touches[0].clientY;
+            }
+
+            const deltaX = currentX - lastTouchPos.current.x;
+            const deltaY = currentY - lastTouchPos.current.y;
 
             const sensitivity = 0.008;
 
@@ -102,12 +121,12 @@ export const Player = () => {
             cameraOrbitRef.current.theta = newTheta;
             cameraOrbitRef.current.phi = newPhi;
 
-            lastTouchPos.current = { x: centerX, y: centerY };
+            lastTouchPos.current = { x: currentX, y: currentY };
         }
     };
 
     const handleTouchEnd = (e) => {
-        if (e.touches.length < 2) {
+        if (e.touches.length === 0) {
             setIsDragging(false);
         }
         touchCount.current = e.touches.length;

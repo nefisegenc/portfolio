@@ -90,7 +90,7 @@ export const Interface = () => {
             <div className="flex justify-between items-start">
                 <div>
                     <h1 className="text-2xl md:text-4xl font-bold text-white tracking-wider font-mono">
-                        {personalInfo.name.toUpperCase()}
+                        {personalInfo.name.toLocaleUpperCase('tr-TR')}
                     </h1>
                     <p className="text-xs md:text-base text-gray-400 font-mono">{personalInfo.title.toUpperCase()}</p>
                     <button
