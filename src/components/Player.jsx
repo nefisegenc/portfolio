@@ -8,11 +8,8 @@ export const Player = () => {
     const capeRef = useRef();
     const [keys, setKeys] = useState({ w: false, a: false, s: false, d: false });
 
-    // Camera orbit state - controlled by mouse/touchpad
-    const [cameraOrbit, setCameraOrbit] = useState({
-        theta: 0,      // Horizontal angle (yaw)
-        phi: 0.3       // Vertical angle (pitch) - starts slightly above
-    });
+    // Camera orbit ref - controlled by mouse/touchpad and A/D keys
+    const cameraOrbitRef = useRef({ theta: 0, phi: 0.3 });
     const [isDragging, setIsDragging] = useState(false);
     const lastMousePos = useRef({ x: 0, y: 0 });
 
@@ -59,10 +56,10 @@ export const Player = () => {
 
         const sensitivity = 0.005;
 
-        setCameraOrbit(prev => ({
-            theta: prev.theta - deltaX * sensitivity,
-            phi: Math.max(-0.5, Math.min(1.2, prev.phi + deltaY * sensitivity))
-        }));
+        const newTheta = cameraOrbitRef.current.theta - deltaX * sensitivity;
+        const newPhi = Math.max(-0.5, Math.min(1.2, cameraOrbitRef.current.phi + deltaY * sensitivity));
+        cameraOrbitRef.current.theta = newTheta;
+        cameraOrbitRef.current.phi = newPhi;
 
         lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
@@ -94,10 +91,10 @@ export const Player = () => {
 
             const sensitivity = 0.008;
 
-            setCameraOrbit(prev => ({
-                theta: prev.theta - deltaX * sensitivity,
-                phi: Math.max(-0.5, Math.min(1.2, prev.phi + deltaY * sensitivity))
-            }));
+            const newTheta = cameraOrbitRef.current.theta - deltaX * sensitivity;
+            const newPhi = Math.max(-0.5, Math.min(1.2, cameraOrbitRef.current.phi + deltaY * sensitivity));
+            cameraOrbitRef.current.theta = newTheta;
+            cameraOrbitRef.current.phi = newPhi;
 
             lastTouchPos.current = { x: centerX, y: centerY };
         }
@@ -116,10 +113,10 @@ export const Player = () => {
         if (Math.abs(e.deltaX) > 0 || e.ctrlKey) {
             // Horizontal scroll or pinch gesture - rotate camera
             const sensitivity = 0.003;
-            setCameraOrbit(prev => ({
-                theta: prev.theta - e.deltaX * sensitivity,
-                phi: Math.max(-0.5, Math.min(1.2, prev.phi + e.deltaY * sensitivity * 0.5))
-            }));
+            const newTheta = cameraOrbitRef.current.theta - e.deltaX * sensitivity;
+            const newPhi = Math.max(-0.5, Math.min(1.2, cameraOrbitRef.current.phi + e.deltaY * sensitivity * 0.5));
+            cameraOrbitRef.current.theta = newTheta;
+            cameraOrbitRef.current.phi = newPhi;
             e.preventDefault();
         }
     };
@@ -160,20 +157,33 @@ export const Player = () => {
 
         const player = playerRef.current;
 
+        // A/D keys rotate camera via ref only (no setState in useFrame to avoid infinite loop)
+        const cameraRotateSpeed = 0.03;
+        if (keys.a) {
+            cameraOrbitRef.current.theta += cameraRotateSpeed;
+        }
+        if (keys.d) {
+            cameraOrbitRef.current.theta -= cameraRotateSpeed;
+        }
+
+        // Use ref values for camera calculations (combines keyboard rotation with mouse/touch)
+        const currentTheta = cameraOrbitRef.current.theta;
+        const currentPhi = cameraOrbitRef.current.phi;
+
         // Camera looks FROM behind the character TOWARDS the character
         // When theta=0, camera is behind (-Z from character), looking at +Z direction
         // Character should move in the direction the camera is pointing
         const cameraForward = new Vector3(
-            Math.sin(cameraOrbit.theta),
+            Math.sin(currentTheta),
             0,
-            Math.cos(cameraOrbit.theta)
+            Math.cos(currentTheta)
         ).normalize();
 
         // Camera right direction (perpendicular to forward on horizontal plane)
         const cameraRight = new Vector3(
-            -Math.cos(cameraOrbit.theta),
+            -Math.cos(currentTheta),
             0,
-            Math.sin(cameraOrbit.theta)
+            Math.sin(currentTheta)
         ).normalize();
 
         // MOVEMENT LOGIC
@@ -183,14 +193,14 @@ export const Player = () => {
         const { controls } = useStore.getState();
 
         // Combine Desktop (Keys) and Mobile (Store) inputs
+        // A/D only rotate camera, do NOT set inputX for desktop
         let inputX = 0;
         let inputZ = 0;
 
-        // Desktop Keys
-        if (keys.d) inputX += 1;
-        if (keys.a) inputX -= 1;
+        // Desktop Keys - W/S for forward/backward ONLY
         if (keys.s) inputZ += 1;
         if (keys.w) inputZ -= 1;
+        // A/D handled above for camera rotation only - no movement
 
         // Mobile Controls (D-Pad)
         if (controls.x !== 0) inputX += controls.x; // Right/Left
@@ -200,7 +210,7 @@ export const Player = () => {
         inputX = Math.max(-1, Math.min(1, inputX));
         inputZ = Math.max(-1, Math.min(1, inputZ));
 
-        const isMoving = inputX !== 0 || inputZ !== 0;
+        const isMoving = inputZ !== 0 || inputX !== 0;
 
         if (isMoving) {
             const moveDirection = new Vector3();
@@ -229,7 +239,7 @@ export const Player = () => {
         // ROTATION LOGIC: ALWAYS LOCK TO CAMERA
         // Character faces the same direction the camera is looking
         // When theta=0, camera behind character, so character faces +Z (rotation.y = 0)
-        const targetRotation = cameraOrbit.theta;
+        const targetRotation = currentTheta;
 
         // Smoothly rotate player to match camera
         let angleDiff = targetRotation - player.rotation.y;
@@ -249,15 +259,15 @@ export const Player = () => {
         player.position.z = Math.max(-9.5, Math.min(9.5, player.position.z));
 
         // Camera Follow with orbit control
-        // Camera orbits around character based on cameraOrbit.theta
+        // Camera orbits around character based on currentTheta
         // theta=0 means camera is behind character (-Z offset)
         // We add PI so that when theta=0, camera is at negative Z (behind)
-        const cameraTheta = cameraOrbit.theta + Math.PI;
+        const cameraTheta = currentTheta + Math.PI;
 
         // Spherical to Cartesian conversion for camera position
-        const offsetX = Math.sin(cameraTheta) * cameraDistance * Math.cos(cameraOrbit.phi);
-        const offsetZ = Math.cos(cameraTheta) * cameraDistance * Math.cos(cameraOrbit.phi);
-        const offsetY = cameraHeight + Math.sin(cameraOrbit.phi) * cameraDistance * 0.5;
+        const offsetX = Math.sin(cameraTheta) * cameraDistance * Math.cos(currentPhi);
+        const offsetZ = Math.cos(cameraTheta) * cameraDistance * Math.cos(currentPhi);
+        const offsetY = cameraHeight + Math.sin(currentPhi) * cameraDistance * 0.5;
 
         const cameraOffset = new Vector3(offsetX, offsetY, offsetZ);
         const cameraTargetPosition = player.position.clone().add(cameraOffset);
