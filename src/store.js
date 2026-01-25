@@ -8,4 +8,8 @@ export const useStore = create((set) => ({
     // Mobile Controls
     controls: { x: 0, z: 0 },
     setControls: (x, z) => set({ controls: { x, z } }),
+
+    // Bio/CV Modal State
+    bioOpen: false,
+    setBioOpen: (isOpen) => set({ bioOpen: isOpen }),
 }));

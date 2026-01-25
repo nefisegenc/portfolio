@@ -30,7 +30,14 @@ export const projects = [
         link: "https://www.param.com.tr",
         tech: ["HTML5", "CSS3", "SCSS", "JavaScript", "jQuery", "Bootstrap 5", "ASP.NET"],
         role: "Frontend Developer",
-        year: "2024 - Present"
+        year: "2024 - Present",
+        features: [
+            "Corporate Fintech Identity",
+            "Responsive & Mobile-First Design",
+            "Advanced Security Standards",
+            "Dynamic Content Management",
+            "High-Performance Architecture"
+        ]
     },
     {
         id: 3,
@@ -41,7 +48,14 @@ export const projects = [
         link: "https://www.paramtech.com.tr",
         tech: ["HTML5", "CSS3", "SCSS", "JavaScript", "jQuery", "Bootstrap 5", "ASP.NET"],
         role: "Frontend Developer",
-        year: "2024 - Present"
+        year: "2024 - Present",
+        features: [
+            "Technology Solutions Showcase",
+            "Interactive Career Platform",
+            "Modern & Clean UI/UX",
+            "Performance-Oriented Development",
+            "SEO-Optimized Structure"
+        ]
     },
     {
         id: 4,

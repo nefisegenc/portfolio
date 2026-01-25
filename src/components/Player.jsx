@@ -49,6 +49,9 @@ export const Player = () => {
     };
 
     const handleMouseMove = (e) => {
+        // Disable rotation if About modal or Project modal is open
+        if (useStore.getState().bioOpen || useStore.getState().currentProject) return;
+
         if (!isDragging) return;
 
         const deltaX = e.clientX - lastMousePos.current.x;
@@ -82,6 +85,9 @@ export const Player = () => {
     };
 
     const handleTouchMove = (e) => {
+        // Disable rotation if About modal or Project modal is open
+        if (useStore.getState().bioOpen || useStore.getState().currentProject) return;
+
         if (e.touches.length === 2 && isDragging) {
             const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
             const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
@@ -109,6 +115,9 @@ export const Player = () => {
 
     // Wheel handler for zoom-like camera distance (optional enhancement)
     const handleWheel = (e) => {
+        // Disable rotation if About modal or Project modal is open
+        if (useStore.getState().bioOpen || useStore.getState().currentProject) return;
+
         // Two-finger scroll on trackpad
         if (Math.abs(e.deltaX) > 0 || e.ctrlKey) {
             // Horizontal scroll or pinch gesture - rotate camera
@@ -155,6 +164,11 @@ export const Player = () => {
     useFrame((state) => {
         if (!playerRef.current) return;
 
+        const { controls, bioOpen, currentProject } = useStore.getState();
+
+        // 🛑 Completely disable movement and camera rotation if Modal is Open
+        if (bioOpen || currentProject) return;
+
         const player = playerRef.current;
 
         // A/D keys rotate camera via ref only (no setState in useFrame to avoid infinite loop)
@@ -189,8 +203,6 @@ export const Player = () => {
         // MOVEMENT LOGIC
         // Unified Logic: Character always faces away from camera (Locked Orientation)
         // Controls move character relative to camera (Strafe)
-
-        const { controls } = useStore.getState();
 
         // Combine Desktop (Keys) and Mobile (Store) inputs
         // A/D only rotate camera, do NOT set inputX for desktop

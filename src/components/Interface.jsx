@@ -16,11 +16,11 @@ import { Joystick } from "./Joystick";
 const HINT_MESSAGE = "Tablolara doğru ilerleyerek projelerimi keşfet...";
 
 export const Interface = () => {
-    const { currentProject, closeProject } = useStore();
+    const { currentProject, closeProject, bioOpen, setBioOpen } = useStore();
     const [activeCategory, setActiveCategory] = useState(null);
     const [activeSubProject, setActiveSubProject] = useState(null);
     const [zoomedImage, setZoomedImage] = useState(null);
-    const [bioOpen, setBioOpen] = useState(false);
+    // bioOpen moved to global store
     const [showHint, setShowHint] = useState(true);
     const [displayedText, setDisplayedText] = useState("");
     const [textComplete, setTextComplete] = useState(false);
@@ -71,6 +71,18 @@ export const Interface = () => {
             setZoomedImage(null);
         }
     }, [currentProject]);
+
+    // Lock body scroll when Bio/CV is open
+    useEffect(() => {
+        if (bioOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'auto';
+        }
+        return () => {
+            document.body.style.overflow = 'auto';
+        };
+    }, [bioOpen]);
 
     return (
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10 flex flex-col justify-between p-4 md:p-8">
@@ -425,11 +437,11 @@ export const Interface = () => {
             {/* Bio / CV Modal */}
             {bioOpen && (
                 <div
-                    className="fixed inset-0 z-[70] bg-black/90 flex items-start justify-center p-8 animate-fade-in pointer-events-auto overflow-y-auto"
+                    className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4 md:p-8 animate-fade-in pointer-events-auto overflow-hidden"
                     onClick={() => setBioOpen(false)}
                 >
                     <div
-                        className="bg-gray-900 border border-gray-700 p-8 rounded-lg max-w-3xl w-full shadow-2xl relative my-auto"
+                        className="bg-gray-900 border border-gray-700 p-6 md:p-8 rounded-lg max-w-3xl w-full shadow-2xl relative max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
@@ -439,7 +451,7 @@ export const Interface = () => {
                             CLOSE [X]
                         </button>
 
-                        <div className="space-y-8">
+                        <div className="space-y-6">
                             {/* Header */}
                             <div className="border-b border-gray-800 pb-6">
                                 <h2 className="text-3xl font-bold text-white mb-2">{personalInfo.name}</h2>
