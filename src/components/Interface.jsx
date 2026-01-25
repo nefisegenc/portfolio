@@ -341,12 +341,12 @@ export const Interface = () => {
             {/* Game-style Onboarding Hint with Typewriter Effect */}
             {showHint && (
                 <div
-                    className="absolute bottom-24 left-1/2 -translate-x-1/2 text-center"
+                    className="absolute top-24 md:top-auto md:bottom-24 left-1/2 -translate-x-1/2 text-center w-full max-w-md px-4 md:max-w-none md:w-auto"
                     style={{
                         animation: 'fadeInUp 0.5s ease-out'
                     }}
                 >
-                    <div className="bg-black/80 backdrop-blur-md border-2 border-cyan-500/50 rounded-lg px-8 py-5 shadow-2xl shadow-cyan-500/20">
+                    <div className="bg-black/80 backdrop-blur-md border-2 border-cyan-500/50 rounded-lg px-6 py-4 md:px-8 md:py-5 shadow-2xl shadow-cyan-500/20">
                         {/* WASD Keys visual - Hidden on Mobile */}
                         <div className="hidden md:block">
                             <div className="flex justify-center gap-1 mb-3">
@@ -360,7 +360,7 @@ export const Interface = () => {
                         </div>
 
                         {/* Mobile Hint */}
-                        <div className="md:hidden absolute top-[-150px] left-1/2 -translate-x-1/2 w-[200px] text-cyan-400 mb-2 font-mono text-sm border border-cyan-500/30 rounded p-2 bg-cyan-900/80 backdrop-blur-md">
+                        <div className="md:hidden text-cyan-400 mb-3 font-mono text-xs border border-cyan-500/30 rounded p-2 bg-cyan-900/40">
                             USE JOYSTICK TO MOVE<br />
                             DRAG SCREEN TO LOOK
                         </div>
