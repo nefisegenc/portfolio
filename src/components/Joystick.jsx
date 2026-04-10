@@ -1,11 +1,16 @@
-import { useRef, useEffect } from 'react';
+import { useRef } from 'react';
 import { useStore } from '../store';
 
 export const Joystick = () => {
     const setControls = useStore((state) => state.setControls);
+    const currentProject = useStore((state) => state.currentProject);
+    const bioOpen = useStore((state) => state.bioOpen);
 
     // Track active touches
     const activeDirections = useRef({ up: false, down: false, left: false, right: false });
+
+    // Hide joystick when any modal is open
+    if (currentProject || bioOpen) return null;
 
     const updateControls = () => {
         let x = 0;

@@ -114,17 +114,17 @@ export const Interface = () => {
                     onClick={() => closeProject()}
                 >
                     <div
-                        className="bg-gray-900 border border-gray-700 p-4 md:p-8 rounded-lg max-w-4xl w-full shadow-2xl overflow-y-auto max-h-[90vh]"
+                        className="bg-gray-900 border border-gray-700 p-4 md:p-8 rounded-lg max-w-4xl w-full shadow-2xl overflow-y-auto max-h-[92vh] md:max-h-[90vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex flex-col gap-6">
                             {/* Header */}
                             <div className="flex justify-between items-start sticky top-0 bg-gray-900/95 backdrop-blur z-10 pb-4 border-b border-gray-800">
                                 <div>
-                                    <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
+                                    <h2 className="text-2xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
                                         {currentProject.title}
                                     </h2>
-                                    <p className="text-gray-400 mt-2">{currentProject.year} | {currentProject.role}</p>
+                                    <p className="text-gray-400 mt-2 text-sm md:text-base">{currentProject.year} | {currentProject.role}</p>
                                 </div>
                                 <button
                                     className="text-gray-400 hover:text-white transition-colors p-2"
@@ -151,7 +151,7 @@ export const Interface = () => {
                                                 Back to {activeSubProject.name} Categories
                                             </button>
                                             <h3 className="text-2xl font-bold text-white mb-4">{activeCategory.name}</h3>
-                                            <div className="grid grid-cols-4 gap-4">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                                                 {activeCategory.images.map((img, index) => (
                                                     <div
                                                         key={index}
@@ -180,7 +180,7 @@ export const Interface = () => {
                                             <h3 className="text-2xl font-bold text-white mb-6">
                                                 {activeSubProject.name} <span className="text-gray-500 font-normal">/ Select Category</span>
                                             </h3>
-                                            <div className="grid grid-cols-2 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                                                 {activeSubProject.categories && activeSubProject.categories.map((cat, index) => (
                                                     <div
                                                         key={index}
@@ -217,7 +217,7 @@ export const Interface = () => {
                                         // Level 1: SubProjects / Clients List View
                                         <div className="animate-fade-in">
                                             <h3 className="text-xl font-bold text-gray-400 mb-6">Select Client Project</h3>
-                                            <div className="grid grid-cols-2 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                                                 {currentProject.designProjects && currentProject.designProjects.map((subProj, index) => (
                                                     <div
                                                         key={index}
@@ -232,12 +232,12 @@ export const Interface = () => {
                                                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                                             />
                                                         </div>
-                                                        <div className="p-6 flex justify-between items-center bg-gray-900/80 backdrop-blur-sm">
+                                                        <div className="p-4 md:p-6 flex justify-between items-center bg-gray-900/80 backdrop-blur-sm">
                                                             <div>
-                                                                <h3 className="text-2xl font-bold text-white group-hover:text-cyan-400 transition-colors">{subProj.name}</h3>
-                                                                <p className="text-sm text-gray-400 mt-1">{subProj.categories.length} Categories</p>
+                                                                <h3 className="text-lg md:text-2xl font-bold text-white group-hover:text-cyan-400 transition-colors">{subProj.name}</h3>
+                                                                <p className="text-xs md:text-sm text-gray-400 mt-1">{subProj.categories.length} Categories</p>
                                                             </div>
-                                                            <span className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-cyan-500 group-hover:text-black transition-all">→</span>
+                                                            <span className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-cyan-500 group-hover:text-black transition-all">→</span>
                                                         </div>
                                                     </div>
                                                 ))}
