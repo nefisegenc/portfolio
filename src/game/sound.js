@@ -27,7 +27,7 @@ const DAY_CHORDS = [
 const NIGHT_CHORDS = [DAY_CHORDS[1], DAY_CHORDS[2], DAY_CHORDS[0], DAY_CHORDS[3]];
 
 const makeReverb = () => {
-    const length = ctx.sampleRate * 2.4;
+    const length = ctx.sampleRate * 1.6;
     const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
         const data = buffer.getChannelData(ch);
@@ -149,8 +149,7 @@ const scheduleBeat = (time) => {
     if (beat % 8 === 0) {
         const chord = chords[(beat / 8) % chords.length];
         chord.forEach((freq) => {
-            tone({ freq, start, attack: 1.2, decay: BEAT * 8, volume: night ? 0.05 : 0.06, bus: musicBus, filter: 900 });
-            tone({ freq: freq * 1.004, start, attack: 1.4, decay: BEAT * 8, volume: 0.03, bus: musicBus, filter: 700 });
+            tone({ freq, start, attack: 1.2, decay: BEAT * 8, volume: night ? 0.06 : 0.07, bus: musicBus, filter: 900 });
         });
     }
 

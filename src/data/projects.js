@@ -355,7 +355,11 @@ export const personalInfo = {
             company: "Invisible Technologies",
             location: "Remote",
             dates: "Aug 2026 – Present",
-            highlights: [],
+            highlights: [
+                "Train and evaluate large language models on software development tasks, producing high-quality training data",
+                "Write, review and debug code to create reference solutions and test cases for AI models",
+                "Assess AI-generated code for correctness, readability and best practices, with detailed written feedback",
+            ],
         },
         {
             title: "Front-End Developer",

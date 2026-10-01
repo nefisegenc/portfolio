@@ -184,7 +184,15 @@ export const personalTr = {
     },
     // Keyed by company name.
     experience: {
-        "Invisible Technologies": { location: "Uzaktan", dates: "Ağustos 2026 – Günümüz" },
+        "Invisible Technologies": {
+            location: "Uzaktan",
+            dates: "Ağustos 2026 – Günümüz",
+            highlights: [
+                "Büyük dil modellerini yazılım geliştirme görevleri üzerinde eğitip değerlendiriyor, yüksek kaliteli eğitim verisi üretiyorum",
+                "AI modelleri için referans çözümler ve test senaryoları oluşturmak üzere kod yazıyor, inceliyor ve hata ayıklıyorum",
+                "AI tarafından üretilen kodu doğruluk, okunabilirlik ve en iyi uygulamalar açısından değerlendirip ayrıntılı yazılı geri bildirim veriyorum",
+            ],
+        },
         PARAMTech: {
             location: "İzmir, Türkiye",
             dates: "Temmuz 2024 – Aralık 2025",

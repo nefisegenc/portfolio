@@ -61,6 +61,11 @@ export const useStore = create((set, get) => ({
     webgl: hasWebGL(),
     phase: hasWebGL() ? "title" : "quick",
     sceneReady: false,
+    // Render quality, adjusted at runtime by the frame-rate monitor:
+    // 2 = full, 1 = lighter effects and resolution, 0 = minimum.
+    quality: window.matchMedia("(pointer: coarse)").matches ? 1 : 2,
+    stepQuality: (delta) => set({ quality: Math.max(0, Math.min(2, get().quality + delta)) }),
+    setQuality: (quality) => set({ quality }),
     loadProgress: 0,
     setLoadProgress: (loadProgress) => set({ loadProgress }),
     startedAt: 0,
