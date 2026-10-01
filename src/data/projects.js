@@ -1,226 +1,389 @@
+// Every project lives on the island as a landmark (see src/data/world.js).
+// `date` is the start date (YYYY-MM, or YYYY when the month is unknown) and
+// orders the quick view from newest to oldest.
+// Images are optimized WebP files in public/img; posters/ holds the small
+// versions used as 3D textures.
+
 export const projects = [
     {
-        id: 1,
+        id: "nature",
+        title: "Nature Kahve",
+        tagline: "Website redesign for an İstanbul coffee supplier",
+        description:
+            "A new website for NC Nature Kahve, which has supplied offices, cafés, hotels and patisseries in İstanbul with coffee, professional coffee machines, syrups and technical service since 2009. The redesign turns a large product range into a warm, editorial experience with a searchable catalogue, a two-question coffee finder and an interactive machine showcase, all hand-built without frameworks.",
+        cover: "/img/nature-cover.webp",
+        gallery: [
+            "/img/nature-about.webp",
+            "/img/nature-menu.webp",
+            "/img/nature-finder.webp",
+            "/img/nature-machine.webp",
+            "/img/nature-references.webp",
+            "/img/nature-catalog.webp",
+            "/img/nature-devices.webp",
+            "/img/nature-mobile.webp",
+        ],
+        // The redesign isn't live yet; add the link once it replaces the old site.
+        link: null,
+        status: "Launching soon",
+        github: null,
+        tech: ["HTML5", "CSS3", "Vanilla JavaScript", "Netlify"],
+        role: "Design & Frontend Development",
+        year: "September 2026",
+        date: "2026-09",
+        features: [
+            "Searchable catalogue: 41 products, 225 syrup & sauce flavours",
+            "“Find your coffee in two questions” matcher",
+            "Interactive machine showcase with hotspots",
+            "Quote request form with inline validation",
+            "Hand-built HTML, CSS & JS with self-hosted fonts",
+        ],
+    },
+    {
+        id: "soap",
+        title: "The Soap Opera",
+        tagline: "E-commerce for a handmade olive oil soap brand",
+        description:
+            "Website and online store for The Soap Opera, a vegan, handmade olive oil soap brand rooted in Gaziantep's centuries-old soap tradition and designed in the Netherlands. I designed and built the storefront: a calm, nature-inspired interface with a cart and Stripe checkout, served in seven languages.",
+        cover: "/img/soap-cover.webp",
+        gallery: [
+            "/img/soap-site-hero.webp",
+            "/img/soap-site-product.webp",
+            "/img/soap-site-sustain.webp",
+            "/img/soap-site-ritual.webp",
+            "/img/soap-campaign.webp",
+            "/img/soap-brand-board.webp",
+        ],
+        link: "https://www.thesoapopera.co",
+        github: "https://github.com/nefisegenc/the-soap-opera",
+        tech: ["Next.js 16", "React 19", "TypeScript", "Tailwind CSS 4", "Stripe Checkout", "Vercel"],
+        role: "Design & Frontend Development",
+        year: "July 2026",
+        date: "2026-07",
+        features: [
+            "Shopping cart with Stripe Checkout",
+            "7 languages: TR, EN, NL, DE, FR, ES, IT",
+            "Server-side price validation for secure payments",
+            "Privacy, cookie and KVKK policy pages",
+            "Calm, brand-driven UI with hand-drawn icons",
+        ],
+    },
+    {
+        id: "hypatia",
         title: "Hypatia Team",
-        description: "Official website for Hypatia team. Led the software and design team, designed UI/UX and developed the full web platform using modern frontend technologies.",
-        image: "/projects/hypatia-promo.png",
-        modalImage: "/projects/hypatia-detail.png",
-        secondaryImage: "/projects/hypatia-team.png",
+        tagline: "Website for a free online education community",
+        description:
+            "Official website of Hypatia, a community-driven initiative I co-founded that provides free online education and has reached 300+ students with nearly 50 volunteer teachers. I led the software and design team and owned the platform end to end, from UI/UX design to frontend implementation.",
+        cover: "/img/hypatia-cover.webp",
+        gallery: ["/img/hypatia-home.webp", "/img/hypatia-team.webp", "/img/hypatia-cover.webp"],
         link: "https://hypatiateam.com",
+        github: "https://github.com/nefisegenc/hypatia-community-",
         tech: ["Next.js", "React", "TypeScript", "Tailwind CSS", "Vercel"],
-        role: "Lead Software & Design Team",
-        year: "Jan 2023",
-        // Extended details
-        duration: "Jan 2023",
+        role: "Lead, Software & Design Team",
+        year: "2023 – Present",
+        date: "2023-01",
         features: [
-            "Responsive Web Design",
-            "Multi-language Support (TR/EN)",
-            "Contact Form Integration",
-            "SEO & Performance Optimization",
-            "Modern UI/UX with Clean Architecture"
+            "Responsive web design",
+            "Multi-language support (TR/EN)",
+            "Contact form integration",
+            "SEO & performance optimization",
+            "Modern UI/UX with clean architecture",
         ],
-        github: "https://github.com/nefisegenc/hypatia-community-"
     },
     {
-        id: 2,
-        title: "Param Corporate Website",
-        description: "Corporate website for Param, a leading fintech company. Built with responsive design and modern web technologies.",
-        image: "/projects/param-promo.jpg",
-        modalImage: "/projects/param-detail.png",
+        id: "param",
+        title: "Param",
+        tagline: "Corporate website for a leading fintech",
+        description:
+            "Corporate website for Param, a leading fintech company. Built with responsive design and modern web technologies.",
+        cover: "/img/param-cover.webp",
+        gallery: ["/img/param-home.webp", "/img/param-cover.webp"],
         link: "https://www.param.com.tr",
+        github: null,
         tech: ["HTML5", "CSS3", "SCSS", "JavaScript", "jQuery", "Bootstrap 5", "ASP.NET"],
         role: "Frontend Developer",
-        year: "2024 - Present",
+        year: "2024 – 2025",
+        date: "2024-07",
         features: [
-            "Corporate Fintech Identity",
-            "Responsive & Mobile-First Design",
-            "Advanced Security Standards",
-            "Dynamic Content Management",
-            "High-Performance Architecture"
-        ]
+            "Corporate fintech identity",
+            "Responsive & mobile-first design",
+            "Advanced security standards",
+            "Dynamic content management",
+            "High-performance architecture",
+        ],
     },
     {
-        id: 3,
-        title: "ParamTech Website",
-        description: "Technology division website for Param. Developed responsive layouts and optimized performance for better user experience.",
-        image: "/projects/paramtech-promo.jpg",
-        modalImage: "/projects/paramtech-detail.png",
+        id: "paramtech",
+        title: "ParamTech",
+        tagline: "Technology division website & mailing tool",
+        description:
+            "Website for Param's technology division. I developed responsive layouts and optimized performance, and built a web-based mailing tool that turns marketing copy into structured HTML email templates.",
+        cover: "/img/paramtech-home.webp",
+        gallery: ["/img/paramtech-home.webp", "/img/paramtech-mailing.webp"],
         link: "https://www.paramtech.com.tr",
+        github: null,
         tech: ["HTML5", "CSS3", "SCSS", "JavaScript", "jQuery", "Bootstrap 5", "ASP.NET"],
         role: "Frontend Developer",
-        year: "2024 - Present",
+        year: "2024 – 2025",
+        date: "2024-07",
         features: [
-            "Technology Solutions Showcase",
-            "Interactive Career Platform",
-            "Modern & Clean UI/UX",
-            "Performance-Oriented Development",
-            "SEO-Optimized Structure"
-        ]
+            "Technology solutions showcase",
+            "Interactive career platform",
+            "HTML email template generator",
+            "Performance-oriented development",
+            "SEO-optimized structure",
+        ],
     },
     {
-        id: 4,
+        id: "rime",
         title: "Rime Stream",
-        description: "Personal music platform and streaming service with modern UI. Built with React and Next.js for optimal performance and SEO.",
-        image: "/projects/rimestream-promo.png",
-        modalImage: "/projects/rimestream-detail.png",
-        secondaryImage: "/projects/rimestream-competitions.jpg",
+        tagline: "Music platform with live contests",
+        description:
+            "Music platform and streaming service with a modern UI, live voting and competitions. Built with React and Next.js for performance and SEO, with a React Native companion app.",
+        cover: "/img/rime-cover.webp",
+        gallery: ["/img/rime-dashboard.webp", "/img/rime-contests.webp", "/img/rime-cover.webp"],
         link: "https://www.rimestream.com/",
-        tech: [
-            "Next.js",
-            "React",
-            "TypeScript",
-            "React Native",
-            "Firebase",
-            "Node.js",
-            "Algolia",
-            "Vercel"
-        ],
+        github: null,
+        tech: ["Next.js", "React", "TypeScript", "React Native", "Firebase", "Node.js", "Algolia", "Vercel"],
         role: "Frontend Developer",
-        year: "Sep 2023",
-        // Extended details
-        duration: "Sep 2023",
+        year: "2023",
+        date: "2023-09",
         features: [
-            "Realtime Data & Live Voting",
-            "Live Chat & Comment Systems",
-            "Cross-Platform (Web & Mobile)",
-            "Competition & Scoreboard Management",
-            "Geolocation-based Content Analysis",
-            "Advanced Search with Algolia"
+            "Realtime data & live voting",
+            "Live chat & comment systems",
+            "Cross-platform (web & mobile)",
+            "Competition & scoreboard management",
+            "Geolocation-based content analysis",
+            "Advanced search with Algolia",
         ],
-        github: null
     },
     {
-        id: 5,
-        title: "Isimiz Var Gucumuz Var",
-        description: "My first professional web development project (2022). A corporate website designed to showcase business services. This project laid the foundation for my frontend development career, focusing on responsive layout and fundamental web technologies.",
-        image: "/projects/isimiz-promo.png",
-        modalImage: "/projects/isimiz-detail.png",
-        secondaryImage: "/projects/isimiz-values.png",
+        id: "isimiz",
+        title: "İşimiz Var Gücümüz Var",
+        tagline: "My first professional web project",
+        description:
+            "My first professional web development project (2022): a corporate website showcasing business services for women entrepreneurs. It laid the foundation for my frontend career, with a focus on responsive layout and web fundamentals.",
+        cover: "/img/isimiz-cover.webp",
+        gallery: ["/img/isimiz-hero.webp", "/img/isimiz-services.webp", "/img/isimiz-values.webp", "/img/isimiz-shop.webp"],
         link: "https://www.isimizvargucumuzvar.com/",
+        github: null,
         tech: ["HTML5", "CSS3", "JavaScript", "Bootstrap", "Responsive Design"],
         role: "Junior Frontend Developer",
         year: "2022",
-        duration: "2022",
+        date: "2022",
         features: [
-            "My First Professional Web Project",
-            "Corporate Brand Identity",
-            "Responsive & Mobile-First Design",
-            "Contact & Inquiry Forms",
-            "Cross-Browser Compatibility"
+            "My first professional web project",
+            "Corporate brand identity",
+            "Responsive & mobile-first design",
+            "Contact & inquiry forms",
+            "Cross-browser compatibility",
         ],
-        github: null
     },
     {
-        id: 6,
-        title: "My Arts",
-        description: "A collection of my creative design works, UI explorations, and digital art. This gallery showcases my passion for visual aesthetics beyond code.",
-        image: "/projects/my-arts-cover-2.jpg",
-        link: "#",
-        tech: ["UI Design", "Digital Art", "Creative Direction", "Illustration"],
-        role: "Creative Designer",
-        year: "2023 - Present",
-        duration: "Ongoing",
+        id: "mobile",
+        title: "Mini Catalog App",
+        tagline: "Flutter shopping catalogue · Software Persona internship",
+        description:
+            "A product catalogue app built with Flutter as part of my Software Persona internship. Products are parsed from a JSON feed and can be searched and filtered by category at the same time; each card opens a detail page with a hero image transition, ratings and an add-to-cart confirmation.",
+        cover: "/img/mobile-cover.webp",
+        gallery: ["/img/mobile-browse.webp", "/img/mobile-detail.webp"],
+        link: null,
+        github: "https://github.com/nefisegenc/mobil-app",
+        tech: ["Flutter", "Dart", "Material 3", "JSON parsing", "Named routes"],
+        role: "Flutter Developer",
+        year: "March 2026",
+        date: "2026-03",
         features: [
-            "User Interface Design",
-            "Digital Illustration",
-            "Brand Identity",
-            "Visual Storytelling"
+            "Live search combined with category filters",
+            "Products parsed from a JSON feed into typed models",
+            "Hero image transitions between list and detail",
+            "Named routes that pass the selected product",
+            "Mobile-first Material 3 UI that also runs on the web",
         ],
-        type: "design",
+    },
+    {
+        id: "tasks",
+        title: "Task Tracker",
+        tagline: "Bilingual task manager with tests & CI",
+        description:
+            "A responsive task manager built with React, Tailwind CSS and Vite. Tasks can be added, edited, completed and filtered by status, category and keyword, with priorities, due dates and a live progress bar. The interface switches between Turkish and English, talks to a REST API (JSON Server) with a localStorage fallback, and is covered by Vitest tests that run in GitHub Actions on every push.",
+        cover: "/img/tasks-cover.webp",
+        gallery: ["/img/tasks-list.webp", "/img/tasks-login.webp", "/img/tasks-policy.webp"],
+        link: "https://task-tracker-portfolio.netlify.app",
+        github: "https://github.com/nefisegenc/Task-Tracker",
+        tech: ["React 18", "Tailwind CSS", "Vite", "JSON Server", "Vitest", "Testing Library", "GitHub Actions", "Netlify"],
+        role: "Personal project",
+        year: "February 2026",
+        date: "2026-02",
+        features: [
+            "Add, edit, complete and delete tasks",
+            "Filter by status and category, plus keyword search",
+            "Priorities, due dates and a live progress bar",
+            "Turkish / English interface with login & register screens",
+            "Vitest + Testing Library tests running in GitHub Actions CI",
+        ],
+    },
+    {
+        id: "arts",
+        title: "My Arts",
+        tagline: "Brand identity, social media, packaging & 3D",
+        description:
+            "A collection of my creative design work: brand identities, social media visuals, signage, packaging and 3D. This corner of the island shows my passion for visual aesthetics beyond code.",
+        cover: "/img/arts-cover.webp",
+        gallery: [],
+        link: null,
+        github: null,
+        tech: ["Figma", "Adobe Illustrator", "Canva", "Blender", "Brand Identity", "Illustration"],
+        role: "Designer",
+        year: "2023 – Present",
+        date: "2023",
+        features: ["Brand identity", "Social media design", "Signage & print", "Packaging design", "3D modelling & rendering"],
         designProjects: [
             {
                 name: "Hypatia",
-                thumbnail: "/projects/hypatia-cover.png",
+                thumbnail: "/img/hypatia-social-1.webp",
                 categories: [
                     {
                         name: "Social Media",
                         images: [
-                            "/projects/hypatia-social-1.jpg",
-                            "/projects/hypatia-social-2.jpg",
-                            "/projects/hypatia-social-3.jpg",
-                            "/projects/hypatia-social-4.jpg"
-                        ]
+                            "/img/hypatia-social-1.webp",
+                            "/img/hypatia-social-2.webp",
+                            "/img/hypatia-social-3.webp",
+                            "/img/hypatia-social-4.webp",
+                        ],
                     },
-                    {
-                        name: "Logo",
-                        images: ["/projects/hypatia-cover.png"]
-                    }
-                ]
+                    { name: "Logo", images: ["/img/hypatia-logo.webp"] },
+                ],
             },
             {
                 name: "Mer & Dic",
-                thumbnail: "/projects/art-merdic-logo.jpg",
+                thumbnail: "/img/art-merdic-logo.webp",
                 categories: [
                     {
                         name: "Signage",
-                        images: ["/projects/art-merdic-signage.jpg", "/projects/art-merdic-1.jpg", "/projects/art-merdic-2.jpg", "/projects/art-merdic-signage-2.png"]
+                        images: [
+                            "/img/art-merdic-signage.webp",
+                            "/img/art-merdic-1.webp",
+                            "/img/art-merdic-2.webp",
+                            "/img/art-merdic-signage-2.webp",
+                        ],
                     },
-
-                    {
-                        name: "Logo",
-                        images: ["/projects/art-merdic-logo.jpg", "/projects/art-merdic-logo-2.png"]
-                    },
+                    { name: "Logo", images: ["/img/art-merdic-logo.webp", "/img/art-merdic-logo-2.webp"] },
                     {
                         name: "Marketing",
                         images: [
-                            "/projects/art-merdic-gift-1.png",
-                            "/projects/art-merdic-gift-2.png",
-                            "/projects/art-merdic-marketing-1.jpg",
-                            "/projects/art-merdic-marketing-3.png",
-                            "/projects/art-merdic-marketing-4.png"
-                        ]
+                            "/img/art-merdic-gift-1.webp",
+                            "/img/art-merdic-gift-2.webp",
+                            "/img/art-merdic-marketing-1.webp",
+                            "/img/art-merdic-marketing-3.webp",
+                            "/img/art-merdic-marketing-4.webp",
+                        ],
                     },
                     {
                         name: "Packaging",
                         images: [
-                            "/projects/art-merdic-packaging-1.jpg",
-                            "/projects/art-merdic-packaging-2.jpg",
-                            "/projects/art-merdic-packaging-3.jpg",
-                            "/projects/art-merdic-packaging-4.jpg",
-                            "/projects/art-merdic-packaging-5.jpg"
-                        ]
-                    }
-                ]
-            }
+                            "/img/art-merdic-packaging-1.webp",
+                            "/img/art-merdic-packaging-2.webp",
+                            "/img/art-merdic-packaging-3.webp",
+                            "/img/art-merdic-packaging-4.webp",
+                            "/img/art-merdic-packaging-5.webp",
+                        ],
+                    },
+                ],
+            },
+            {
+                name: "3D Design",
+                thumbnail: "/img/arts-3d-room.webp",
+                categories: [
+                    {
+                        name: "Isometric Room",
+                        images: ["/img/arts-3d-room.webp", "/img/arts-3d-desk.webp", "/img/arts-3d-shelf.webp"],
+                    },
+                ],
+            },
         ],
-        github: null
     },
 ];
+
+export const getProject = (id) => projects.find((p) => p.id === id);
 
 export const personalInfo = {
     name: "Nefise Nur Genç",
     title: "Front-End Developer",
     email: "nefisenurgenc@gmail.com",
-    phone: "+90 533 514 87 77",
-    location: "Istanbul, Turkey",
+    location: "İstanbul, Turkey",
     linkedin: "https://www.linkedin.com/in/nefise-gen%C3%A7-67ba66226/",
     github: "https://github.com/nefisegenc",
-    about: "I'm a front-end developer skilled in React, JavaScript, HTML, and CSS. I create user-friendly and responsive interfaces, with strong problem-solving abilities backed by experience in project management.",
+    youtube: "https://www.youtube.com/@hypatiaateam",
+    about:
+        "I'm a front-end developer skilled in React, JavaScript, HTML, and CSS. I create user-friendly and responsive interfaces, with strong problem-solving abilities backed by experience in project management. I'm proficient in Git, use modern IDEs like VS Code, and apply object-oriented principles in my component-based front-end work. Fluent in Turkish, English, and conversant in German.",
     skills: {
-        programming: ["React.js", "Next.js", "TypeScript", "HTML", "CSS", "SQL", "Python"],
-        tools: ["Git", "GitHub", "VS Code", "WebStorm"],
-        design: ["Ant Design", "Figma", "Canva", "Adobe Illustrator"],
-        practices: ["OOP", "Agile", "API Integration"],
-        platforms: ["JIRA", "PowerBI", "Microsoft Excel"]
+        Programming: ["JavaScript", "TypeScript", "Node.js", "HTML", "CSS", "SCSS", "Dart", "SQL", "Python"],
+        Frameworks: [
+            "React.js",
+            "Next.js",
+            "React Native",
+            "Flutter",
+            "Express.js",
+            "Redux",
+            "Three.js",
+            "Tailwind CSS",
+            "Bootstrap",
+            "jQuery",
+        ],
+        Databases: ["Firebase", "MongoDB", "Microsoft SQL Server"],
+        "AI tools": ["Claude Code", "Claude", "ChatGPT", "OpenAI Codex", "Gemini"],
+        "AI skills": ["AI-assisted development", "Prompt engineering", "AI image generation", "LLM data training & evaluation"],
+        "Version control & tools": ["Git", "GitHub", "Visual Studio Code", "WebStorm"],
+        Design: ["Blender", "Ant Design", "Figma", "Canva", "Adobe Illustrator"],
+        Practices: ["Object-Oriented Programming", "Agile (JIRA)", "API Integration"],
+        Platforms: ["JIRA", "PowerBI", "Microsoft Excel"],
     },
-    languages: ["Turkish (Native)", "English (Advanced)", "German (Elementary)"],
+    languages: [
+        { name: "Turkish", level: "Native" },
+        { name: "English", level: "Advanced" },
+        { name: "German", level: "Elementary" },
+    ],
     education: {
         degree: "Bachelor of Mathematics",
         university: "Dokuz Eylül University",
-        location: "Izmir, Turkey",
-        dates: "Sept 2017 – June 2023"
+        location: "İzmir, Turkey",
+        dates: "Sept 2017 – June 2023",
     },
     experience: [
         {
+            title: "Software Developer – AI Data Trainer",
+            company: "Invisible Technologies",
+            location: "Remote",
+            dates: "Aug 2026 – Present",
+            highlights: [],
+        },
+        {
             title: "Front-End Developer",
             company: "PARAMTech",
-            location: "Izmir, Turkey",
-            dates: "July 2024 – Sept 2025",
+            location: "İzmir, Turkey",
+            dates: "July 2024 – Dec 2025",
             highlights: [
                 "Developed a web-based mailing tool that converts marketing copy into structured HTML email templates",
+                "Built reusable and responsive email layouts tailored for marketing teams",
                 "Optimized React-based interfaces, reducing page load time by approximately 20%",
-                "Managed global state with Redux to ensure consistent data flow"
-            ]
+                "Managed global state with Redux to ensure consistent data flow across the application",
+                "Integrated APIs to support dynamic content generation and template management",
+                "Worked within Agile workflows using Jira for sprint planning and task tracking",
+            ],
+        },
+        {
+            title: "Software Intern",
+            company: "Software Persona",
+            location: "İstanbul, Turkey",
+            dates: "May 2024 – July 2024",
+            highlights: [
+                "Took part in modern web application development, working primarily with React, Next.js and Firebase",
+                "Worked with Microsoft SQL Server on CRUD operations, data modelling and data relationships",
+                "Created 3D models in Blender and integrated them into web projects",
+                "Developed cross-platform mobile applications with Flutter",
+                "Managed data flow between frontend and backend through API integrations, using reusable component-based structures",
+                "Took part in debugging and performance optimization, collaborating with Git",
+            ],
         },
         {
             title: "Front-End Developer",
@@ -228,20 +391,62 @@ export const personalInfo = {
             location: "Remote, Turkey",
             dates: "Jan 2023 – Present",
             highlights: [
-                "Led the software team and coordinated development tasks",
-                "Designed and developed the official Hypatia website",
-                "Created visual designs using Figma, Canva and Adobe Illustrator"
-            ]
+                "Led the software team and coordinated development tasks across the project",
+                "Designed and developed the official Hypatia website, hypatiateam.com",
+                "Owned the full lifecycle of the web platform, from UI/UX design to frontend implementation",
+                "Created visual designs and social media content using Figma, Canva and Adobe Illustrator",
+            ],
         },
         {
             title: "Junior Front-End Web Developer",
             company: "Anatolia System",
-            location: "Istanbul, Turkey",
-            dates: "Aug 2022 – Aug 2023",
+            location: "İstanbul, Turkey",
+            dates: "Aug 2022 – May 2023",
             highlights: [
                 "Created websites for businesses (isimizvargucumuzvar.com and zukkan.com)",
-                "Troubleshot websites on different browsers to ensure quality"
-            ]
-        }
-    ]
+                "Troubleshot website issues across multiple browsers to ensure quality and compatibility",
+                "Took part in pre-project analysis and technical assessments to ensure user-friendly interfaces",
+            ],
+        },
+    ],
+    volunteering: [
+        {
+            title: "Co-Founder & Volunteer Teacher",
+            company: "Hypatia",
+            location: "Remote, Turkey",
+            dates: "Feb 2023 – Present",
+            highlights: [
+                "Co-founded a community-driven initiative providing free online education",
+                "Reached 300+ students with the support of nearly 50 volunteer teachers",
+                "Organized free online mathematics classes for students affected by the 2023 Southeastern Turkey earthquake, and taught as a volunteer mathematics teacher",
+            ],
+        },
+        {
+            title: "Volunteer Teacher",
+            company: "AIESEC",
+            location: "Ivano-Frankivsk, Ukraine",
+            dates: "June 2019 – Sep 2019",
+            highlights: [
+                "Delivered English lessons in an international and multicultural environment",
+                "Strengthened communication and presentation skills through volunteer teaching",
+            ],
+        },
+    ],
+    training: [
+        { name: "UX/UI Expertise Certificate Program", school: "Mindset Institute", location: "İstanbul, Turkey", dates: "Jan 2024 – June 2024" },
+        { name: "Frontend Development Hands-on Training Program", school: "Kreativstorm", location: "Berlin, Germany", dates: "Aug 2023 – Oct 2023" },
+        { name: "English Language Education", school: "Skola English Language School", location: "London, England", dates: "June 2015 – Sep 2015" },
+    ],
+    certificates: [
+        { name: "Google Data Analytics Certificate", issuer: "Google" },
+        { name: "Google Ads Search Certificate", issuer: "Google" },
+        { name: "UI/UX Expertise Certificate", issuer: "Mindset Institute" },
+        { name: "Frontend Development Hands-on Training Program Certificate", issuer: "Kreativstorm" },
+        { name: "Software Internship Participation Certificate", issuer: "Software Persona" },
+        { name: "Hyperautomation for Everyone", issuer: "Global AI Hub" },
+        { name: "Digital Skills: User Experience", issuer: "FutureLearn" },
+        { name: "Internship Certificate", issuer: "AIESEC" },
+        { name: "Volunteer Certificate", issuer: "Dokuz Eylül University" },
+        { name: "Diploma of Achievement in the English Language", issuer: "Skola English School" },
+    ],
 };

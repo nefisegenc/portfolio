@@ -1,16 +1,15 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.jsx'
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import App from "./App.jsx";
+import { useStore } from "./store";
+import { initSound } from "./game/sound";
 
-import { ErrorBoundary } from './components/ErrorBoundary'
+document.documentElement.lang = useStore.getState().lang;
+initSound();
 
-console.log("Main.jsx starting...");
-
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </StrictMode>,
-)
+createRoot(document.getElementById("root")).render(
+    <StrictMode>
+        <App />
+    </StrictMode>
+);

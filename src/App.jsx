@@ -1,27 +1,26 @@
-import { Suspense } from 'react';
-import { Canvas } from "@react-three/fiber";
-import { Experience } from "./components/Experience";
-import { Interface } from "./components/Interface";
-import { Leva } from "leva";
+import { lazy, Suspense } from "react";
+import { Analytics } from "@vercel/analytics/react";
+import { useStore } from "./store";
+import { Overlay } from "./ui/Overlay";
+
+// The 3D scene (three.js and friends) loads in its own chunk so the title
+// screen and quick view appear right away.
+const Scene = lazy(() => import("./game/Scene").then((m) => ({ default: m.Scene })));
 
 function App() {
-  console.log("App component rendering");
-  return (
-    <>
-      <Leva hidden />
-      <Canvas
-        shadows
-        camera={{ position: [0, 2, 5], fov: 75 }}
-        onCreated={() => console.log("Canvas created")}
-      >
-        <Suspense fallback={<group><mesh><boxGeometry /><meshBasicMaterial color="red" /></mesh></group>}>
-          {console.log("Suspense content rendering")}
-          <Experience />
-        </Suspense>
-      </Canvas>
-      <Interface />
-    </>
-  );
+    const webgl = useStore((s) => s.webgl);
+    const paused = useStore((s) => s.phase === "quick");
+    return (
+        <>
+            {webgl && (
+                <Suspense fallback={null}>
+                    <Scene paused={paused} />
+                </Suspense>
+            )}
+            <Overlay />
+            <Analytics />
+        </>
+    );
 }
 
 export default App;
