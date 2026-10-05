@@ -16,18 +16,67 @@ const outline = (radius) => {
     return `M${points.join("L")}Z`;
 };
 
-// Map labels sit outside their marker, away from the plaza, so neighbours
-// never overlap. East/west labels go underneath to stay on the map.
-const labelPlacement = (l) => {
+const MARKER_R = 3.1;
+const LABEL_SIZE = 2.3;
+const LABEL_H = 2.5;
+const MAP_EDGE = 31.6;
+
+let measure;
+const labelWidth = (text) => {
+    measure ??= document.createElement("canvas").getContext("2d");
+    measure.font = "800 100px 'Baloo 2', sans-serif";
+    return (measure.measureText(text).width * LABEL_SIZE) / 100 + 0.7; // + outline
+};
+
+const box = (cx, cy, w) => ({ x0: cx - w / 2, x1: cx + w / 2, y0: cy - LABEL_H / 2, y1: cy + LABEL_H / 2 });
+const overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+const touchesCircle = (b, cx, cy, r) =>
+    Math.hypot(Math.max(b.x0, Math.min(cx, b.x1)) - cx, Math.max(b.y0, Math.min(cy, b.y1)) - cy) < r;
+
+// Spots around a marker, most natural first: diagonally outward, beside it,
+// above/below (then nudged sideways) and finally beside it on the inner side.
+const labelSpots = (l, w) => {
     const r = Math.hypot(l.x, l.z);
     const dx = l.x / r;
     const dz = l.z / r;
-    if (Math.abs(dx) > 0.9) return { x: 0, y: 5.4, textAnchor: "middle" };
-    return {
-        x: dx * 4.4,
-        y: dz * 4.4,
-        textAnchor: dx > 0.3 ? "start" : dx < -0.3 ? "end" : "middle",
-    };
+    const side = dx >= 0 ? 1 : -1;
+    const out = dz < 0 ? -1 : 1;
+    const near = MARKER_R + 0.6;
+    const vertical = (dir, shift) => box(l.x + side * w * shift, l.z + dir * (MARKER_R + 0.35 + LABEL_H / 2), w);
+    return [
+        box(l.x + dx * (MARKER_R + 1.3) + (Math.abs(dx) > 0.3 ? (side * w) / 2 : 0), l.z + dz * (MARKER_R + 1.3), w),
+        box(l.x + side * (near + w / 2), l.z, w),
+        vertical(out, 0),
+        vertical(-out, 0),
+        vertical(out, 0.25),
+        vertical(out, 0.5),
+        vertical(-out, 0.25),
+        vertical(-out, 0.5),
+        box(l.x - side * (near + w / 2), l.z, w),
+    ];
+};
+
+// Gives every label the first spot that stays on the map without touching the
+// plaza, a marker or an earlier label. Positions are relative to the marker.
+const placeLabels = (lang) => {
+    const placed = [];
+    const free = (b) =>
+        b.x0 > -MAP_EDGE &&
+        b.x1 < MAP_EDGE &&
+        b.y0 > -MAP_EDGE &&
+        b.y1 < MAP_EDGE &&
+        !touchesCircle(b, 0, 0, PLAZA_RADIUS + 0.4) &&
+        !landmarks.some((m) => touchesCircle(b, m.x, m.z, MARKER_R + 0.25)) &&
+        !placed.some((p) => overlaps(b, p));
+    return Object.fromEntries(
+        landmarks.map((l) => {
+            const text = l.shortLabel ?? landmarkLabel(l, lang);
+            const spots = labelSpots(l, labelWidth(text));
+            const spot = spots.find(free) ?? spots[0];
+            placed.push(spot);
+            return [l.id, { text, x: (spot.x0 + spot.x1) / 2 - l.x, y: (spot.y0 + spot.y1) / 2 - l.z }];
+        })
+    );
 };
 
 // Top-down SVG of the island; x maps to x and world z maps to y (north is up).
@@ -37,6 +86,7 @@ export const IslandMap = ({ detailed = false, onSelect }) => {
     const lang = useLang();
     const t = useT();
     const shape = useMemo(() => outline(ISLAND_RADIUS), []);
+    const labels = useMemo(() => (detailed ? placeLabels(lang) : {}), [detailed, lang]);
 
     useEffect(() => {
         let frame;
@@ -86,7 +136,9 @@ export const IslandMap = ({ detailed = false, onSelect }) => {
                         </text>
                         {detailed && (
                             <text
-                                {...labelPlacement(l)}
+                                x={labels[l.id].x}
+                                y={labels[l.id].y}
+                                textAnchor="middle"
                                 dominantBaseline="middle"
                                 fontSize="2.3"
                                 fontWeight="800"
@@ -96,7 +148,7 @@ export const IslandMap = ({ detailed = false, onSelect }) => {
                                 paintOrder="stroke"
                                 fontFamily="Baloo 2, sans-serif"
                             >
-                                {l.shortLabel ?? landmarkLabel(l, lang)}
+                                {labels[l.id].text}
                             </text>
                         )}
                     </g>
