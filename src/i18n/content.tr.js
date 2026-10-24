@@ -74,8 +74,9 @@ export const projectsTr = {
     rime: {
         tagline: "Yayınlanmamış müzik, dünya duymadan önce",
         description:
-            "Rime, yayınlanmamış müziklerin evi. Dinleyiciler her gece birkaç yeni parçayı kör dinleyip bir sinyal bırakıyor, küratörler en güçlülerini öne çıkarıyor, her hafta bir parça seçiliyor ve ayın en iyileri dolunayda bir finalde buluşuyor. Sanatçılar yayınlarını Studio ve Release Room'da hazırlıyor. Yenilenen Rime, sezonun her aşamasında renk değiştiren bir aurora ile sakin, gece gökyüzü temalı bir tasarıma sahip ve kurucu sezonunu Kasım 2026'da açıyor. Next.js ve React ile geliştirildi; React Native ile bir mobil uygulaması da var.",
+            "Rime, yayınlanmamış müziklerin evi. Dinleyiciler her gece birkaç yeni parçayı kör dinleyip bir sinyal bırakıyor, küratörler en güçlülerini öne çıkarıyor, her hafta bir parça seçiliyor ve ayın en iyileri dolunayda bir finalde buluşuyor. Sanatçılar yayınlarını Studio ve Release Room'da hazırlıyor. Yeni Rime'ı baştan sona ben tasarlayıp geliştirdim: sezonun her aşamasında renk değiştiren bir aurora ile sakin, gece gökyüzü temalı bir tasarım. Platform, kurucu sezonunu Kasım 2026'da açıyor. Next.js ve React ile geliştirildi; React Native ile bir mobil uygulaması da var.",
         features: [
+            "Baştan sona tasarım ve geliştirme: arayüz tasarımı ve frontend",
             "Her gece kör dinleme: 30 saniye sonra Zayıf, Normal ya da Güçlü",
             "Sanatçılara isimsiz gösterilen küratör sinyalleri",
             "Dinleyicilerin belirlediği haftalık seçim ve aylık final",
@@ -84,7 +85,7 @@ export const projectsTr = {
             "Anlık bildirimli web ve mobil uygulama",
             "Gizlilik öncelikli: reklam yok, çerezsiz analitik",
         ],
-        role: "Frontend Geliştirici",
+        role: "Tasarım ve Frontend Geliştirme",
     },
     isimiz: {
         tagline: "İlk profesyonel web projem",
