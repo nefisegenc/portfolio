@@ -1,4 +1,4 @@
-// Rime Stream: a concert stage with a live dashboard screen and moving lights.
+// Rime: a night-sky stage with a glowing screen, aurora lights and a full moon.
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { AdditiveBlending, DoubleSide } from "three";
@@ -6,12 +6,12 @@ import { Ball, Box, Cyl, GlowMat, Shadowed } from "../parts";
 import { usePoster } from "../textures";
 import { loop } from "../utils";
 
-const DARK = "#2B2440";
-const DARKER = "#1C1729";
-const METAL = "#3D3553";
-const PINK = "#FF4F8B";
-const PURPLE = "#A970FF";
-const CYAN = "#3FD8EC";
+const DARK = "#1A2238";
+const DARKER = "#0E1424";
+const METAL = "#2C3754";
+const ICE = "#8FD8F5";
+const VIOLET = "#9C7CF0";
+const GOLD = "#F2C46D";
 
 const Spotlight = ({ x, color, phase }) => {
     const ref = useRef();
@@ -82,8 +82,8 @@ export const RimeStage = () => {
                 {[-3.1, 3.1].map((x) => (
                     <group key={x} position={[x, 0, 0.9]}>
                         <Box args={[1.0, 1.5, 0.8]} position={[0, 0.75, 0]} color={DARKER} />
-                        <Cyl args={[0.3, 0.3, 0.06, 16]} position={[0, 0.5, 0.41]} rotation-x={Math.PI / 2} color="#4B4262" />
-                        <Cyl args={[0.15, 0.15, 0.06, 16]} position={[0, 1.12, 0.41]} rotation-x={Math.PI / 2} color="#4B4262" />
+                        <Cyl args={[0.3, 0.3, 0.06, 16]} position={[0, 0.5, 0.41]} rotation-x={Math.PI / 2} color="#38456A" />
+                        <Cyl args={[0.15, 0.15, 0.06, 16]} position={[0, 1.12, 0.41]} rotation-x={Math.PI / 2} color="#38456A" />
                     </group>
                 ))}
 
@@ -95,27 +95,32 @@ export const RimeStage = () => {
 
             {/* Neon edges */}
             <Box args={[6.2, 0.07, 0.07]} position={[0, 0.58, 1.42]}>
-                <GlowMat color={PINK} strength={10} />
+                <GlowMat color={ICE} strength={10} />
             </Box>
             {[-3.1, 3.1].map((x) => (
                 <Box key={x} args={[0.07, 4.4, 0.07]} position={[x, 2.3, -2.0]}>
-                    <GlowMat color={PURPLE} strength={10} />
+                    <GlowMat color={VIOLET} strength={10} />
                 </Box>
             ))}
 
-            {/* Live dashboard screen */}
+            {/* Full moon, as in the monthly Final */}
+            <Ball radius={0.55} detail={3} position={[2.3, 5.6, -2.6]}>
+                <GlowMat color={GOLD} strength={4} />
+            </Ball>
+
+            {/* Screen */}
             <mesh position={[0, 2.25, -2.28]}>
                 <planeGeometry args={[5.0, 2.8]} />
                 <meshBasicMaterial map={screen} toneMapped={false} />
             </mesh>
 
-            <Spotlight x={-2} color={PINK} phase={0} />
-            <Spotlight x={0} color={CYAN} phase={2} />
-            <Spotlight x={2} color={PURPLE} phase={4} />
+            <Spotlight x={-2} color={ICE} phase={0} />
+            <Spotlight x={0} color={VIOLET} phase={2} />
+            <Spotlight x={2} color={GOLD} phase={4} />
 
-            <Note color={PINK} offset={0} x={-1.4} />
-            <Note color={CYAN} offset={0.33} x={0.2} />
-            <Note color={PURPLE} offset={0.66} x={1.5} />
+            <Note color={ICE} offset={0} x={-1.4} />
+            <Note color={VIOLET} offset={0.33} x={0.2} />
+            <Note color={GOLD} offset={0.66} x={1.5} />
         </group>
     );
 };
