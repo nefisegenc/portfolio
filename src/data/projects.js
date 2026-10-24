@@ -140,7 +140,7 @@ export const projects = [
         description:
             "Rime is a home for unreleased music. Every night listeners hear a few new tracks blind and leave a signal, curators bring the strongest forward, one track is picked each week and the month's best meet in a Final under a full moon. Artists prepare their releases in Studio and the Release Room. I designed and built the new Rime from scratch: a quiet night-sky look with an aurora that changes colour at each stage of the season, opening its founding season in November 2026. Built with Next.js and React, with a React Native app.",
         cover: "/img/rime-cover.webp",
-        gallery: ["/img/rime-weekly.webp", "/img/rime-finals.webp", "/img/rime-mobile.webp", "/img/rime-app.webp"],
+        gallery: ["/img/rime-signals.webp", "/img/rime-weekly.webp", "/img/rime-studio.webp", "/img/rime-release-room.webp"],
         link: "https://rimestream.com/",
         github: null,
         tech: ["Next.js", "React", "TypeScript", "React Native", "Expo", "Firebase", "Node.js", "Algolia", "Vercel"],
