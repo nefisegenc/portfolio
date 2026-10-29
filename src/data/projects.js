@@ -249,7 +249,6 @@ export const projects = [
                         images: [
                             "/img/hypatia-social-1.webp",
                             "/img/hypatia-social-2.webp",
-                            "/img/hypatia-social-3.webp",
                             "/img/hypatia-social-4.webp",
                         ],
                     },
