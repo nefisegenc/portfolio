@@ -86,6 +86,28 @@ export const huntMusic = {
     },
 };
 
+// Head to Head: a stadium stomp at 128 bpm in C major (16th-note steps):
+// big drums, hand claps, a bouncing bass and a chant every other bar.
+const HEAD_ROOTS = [130.81, 110, 87.31, 98];
+const HEAD_CHANT = { 0: 392, 4: 392, 8: 329.63, 10: 349.23, 12: 392 };
+export const headMusic = {
+    step: 60 / 128 / 4,
+    play(i, t) {
+        const s = i % 16;
+        const bar = Math.floor(i / 16);
+        const root = HEAD_ROOTS[bar % 4];
+        if (s % 4 === 0) kick(t, 0.5);
+        if (s === 4 || s === 12) {
+            snare(t, 0.14);
+            noiseBurst({ start: t, freq: 1500, q: 0.9, duration: 0.07, volume: 0.12, bus: trackOut() });
+        }
+        if (s % 2 === 1) hat(t, 0.028);
+        if (s === 0 || s === 8) note(root / 2, t, { type: "triangle", decay: 0.3, volume: 0.16, filter: 500 });
+        if (s % 4 === 2) note(root, t, { type: "triangle", decay: 0.16, volume: 0.13, filter: 700 });
+        if (bar % 2 === 1 && HEAD_CHANT[s]) note(HEAD_CHANT[s], t, { type: "square", decay: 0.16, volume: 0.035, filter: 2400 });
+    },
+};
+
 // Hi-hat clicks on the beat while Riff Rush counts in, and nothing at all
 // once a show is over.
 export const countIn = { step: 0.5, play: (i, t) => hat(t, 0.06) };
@@ -179,17 +201,44 @@ export const engineLoop = makeLoop({ source: "osc", wave: "sawtooth", freq: 60 }
 export const engineHum = makeLoop({ source: "osc", wave: "square", freq: 30 });
 export const screechLoop = makeLoop({ source: "noise", filter: "bandpass", freq: 2600, q: 7 });
 export const rollLoop = makeLoop({ source: "noise", filter: "lowpass", freq: 200, q: 0.7 });
+export const crowdLoop = makeLoop({ source: "noise", filter: "bandpass", freq: 700, q: 0.5 });
 
 export const silenceLoops = () => {
     engineLoop.set(0);
     engineHum.set(0);
     screechLoop.set(0);
     rollLoop.set(0);
+    crowdLoop.set(0);
 };
 
 // --- Effects ----------------------------------------------------------------
 
 const rand = (a, b) => a + Math.random() * (b - a);
+
+// A referee's whistle: a high tone with a fast trill.
+const whistle = (start, length) => {
+    const audio = getAudio();
+    if (!audio) return;
+    const { ctx, out } = audio;
+    const t = ctx.currentTime + start;
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(2850, t);
+    const trill = ctx.createOscillator();
+    trill.frequency.value = 36;
+    const depth = ctx.createGain();
+    depth.gain.value = 170;
+    trill.connect(depth).connect(osc.frequency);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.07, t + 0.02);
+    gain.gain.setValueAtTime(0.07, t + length);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + length + 0.06);
+    osc.connect(gain).connect(out);
+    [osc, trill].forEach((o) => {
+        o.start(t);
+        o.stop(t + length + 0.1);
+    });
+};
 
 const applause = (length, density, volume) => {
     for (let i = 0; i < density; i++) {
@@ -307,4 +356,45 @@ addEffects({
         [659.25, 783.99, 1046.5].forEach((f, i) => tone({ freq: f, start: i * 0.09, decay: 0.6, volume: 0.12, type: "triangle" }));
         applause(1.2, 20, 0.8);
     },
+    // Head to Head
+    whistle: () => whistle(0, 0.32),
+    finalWhistle: () => {
+        whistle(0, 0.24);
+        whistle(0.36, 0.24);
+        whistle(0.72, 0.8);
+    },
+    swing: () => noiseBurst({ duration: 0.09, freq: 1400, to: 600, q: 1.2, volume: 0.05 }),
+    kickBall: () => {
+        tone({ freq: 150, to: 55, type: "sine", decay: 0.14, volume: 0.42 });
+        noiseBurst({ duration: 0.05, freq: 1100, q: 0.9, volume: 0.16 });
+    },
+    header: () => {
+        tone({ freq: 340, to: 170, type: "triangle", decay: 0.12, volume: 0.14 });
+        noiseBurst({ duration: 0.04, freq: 900, q: 1, volume: 0.1 });
+    },
+    bump: () => tone({ freq: 120, to: 70, type: "sine", decay: 0.1, volume: 0.14 }),
+    thud: (level = 0.5) => tone({ freq: 95, to: 50, type: "sine", decay: 0.12, volume: 0.08 + 0.25 * level }),
+    hop: () => tone({ freq: 240, to: 520, type: "triangle", decay: 0.14, volume: 0.06 }),
+    post: () =>
+        [880, 1320, 1760].forEach((f, i) => tone({ freq: f, type: "square", decay: 0.5 - i * 0.1, volume: 0.04, filter: 3200 })),
+    forceShot: () => {
+        noiseBurst({ duration: 0.5, freq: 400, to: 4000, q: 0.8, volume: 0.25 });
+        tone({ freq: 110, to: 40, type: "sawtooth", decay: 0.4, volume: 0.12, filter: 900 });
+    },
+    knock: () => {
+        tone({ freq: 160, to: 60, type: "square", decay: 0.25, volume: 0.1, filter: 1200 });
+        noiseBurst({ duration: 0.2, freq: 500, q: 0.7, volume: 0.2 });
+    },
+    zap: () => {
+        noiseBurst({ duration: 0.25, freq: 2500, to: 800, q: 2, volume: 0.15 });
+        tone({ freq: 600, to: 200, type: "sawtooth", decay: 0.2, volume: 0.05, filter: 2000 });
+    },
+    goalRoar: () => {
+        noiseBurst({ duration: 2.4, freq: 900, q: 0.35, volume: 0.28, attack: 0.15 });
+        applause(2.4, 50, 1.3);
+        [261.63, 329.63, 392].forEach((f) => tone({ freq: f, type: "sawtooth", attack: 0.02, decay: 1.2, volume: 0.05, filter: 1600 }));
+    },
+    itemSpawn: () => [784, 1046.5].forEach((f, i) => tone({ freq: f, start: i * 0.08, type: "sine", decay: 0.25, volume: 0.07 })),
+    freeze: () =>
+        [1568, 1318.5, 1046.5, 784].forEach((f, i) => tone({ freq: f, start: i * 0.05, type: "square", decay: 0.2, volume: 0.04, filter: 4000 })),
 });

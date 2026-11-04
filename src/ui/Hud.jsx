@@ -96,7 +96,7 @@ const TopRight = ({ helpOpen, onHelp, game }) => {
             <button
                 onClick={() => openPanel({ type: "map" })}
                 aria-label={t("hud.openMap")}
-                className={`card relative aspect-square overflow-hidden rounded-full bg-[#BFE3F5] p-1.5 transition hover:scale-[1.03] ${game === "race" || game === "bugs" || game === "riff" ? "invisible" : ""}`}
+                className={`card relative aspect-square overflow-hidden rounded-full bg-[#BFE3F5] p-1.5 transition hover:scale-[1.03] ${game === "race" || game === "bugs" || game === "riff" || game === "head" ? "invisible" : ""}`}
             >
                 <IslandMap />
                 <span className="keycap absolute bottom-2 right-3 hidden md:inline-grid">M</span>
@@ -393,7 +393,7 @@ export const Hud = () => {
             </div>
             <InteractPrompt />
             {!isTouch && <ControlsHint open={!panel && !game && helpOpen} onClose={() => toggleHelp(false)} />}
-            {isTouch && !panel && !bowling && <MobileControls game={game} />}
+            {isTouch && !panel && !bowling && game !== "head" && <MobileControls game={game} />}
             <GameHud />
         </motion.div>
     );

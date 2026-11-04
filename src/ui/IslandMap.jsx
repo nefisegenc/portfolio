@@ -8,6 +8,8 @@ import {
     BRIDGE_END,
     BRIDGE_START,
     BUG_PORTAL,
+    HEAD_CORNER,
+    HEAD_CORNER_ROT,
     RIFF_STAGE,
     LANE,
     arcadePath,
@@ -226,7 +228,7 @@ const ARCADE_VIEW = 36;
 const ARCADE_SCALE = ARCADE_VIEW / 64;
 const ARCADE_TURN = (-ARCADE.rotY * 180) / Math.PI;
 // Where each game's label goes, relative to its marker.
-const GAME_LABEL_DY = { bowling: 2.7, race: -2.7, bugs: 2.7, riff: -2.7 };
+const GAME_LABEL_DY = { bowling: 2.7, race: -2.7, bugs: 2.7, riff: -2.7, head: -3.3 };
 const [PLAZA_MARK_X, PLAZA_MARK_Z] = bridgePoint(Math.hypot(ARCADE.x, ARCADE.z) - ARCADE_RADIUS - 1.8);
 
 const ArcadeMap = ({ detailed, onSelect }) => {
@@ -259,6 +261,15 @@ const ArcadeMap = ({ detailed, onSelect }) => {
                 />
                 <rect x={BUG_PORTAL.x - 2.2} y={BUG_PORTAL.z - 0.4} width={4.4} height={0.8} rx={0.4} fill="#22C55E" />
                 <rect x={RIFF_STAGE.x - 1.9} y={RIFF_STAGE.z - 0.9} width={3.8} height={1.8} rx={0.3} fill="#2A2340" />
+                <rect
+                    x={-1.3}
+                    y={-0.9}
+                    width={2.6}
+                    height={1}
+                    rx={0.2}
+                    fill="#0EA5E9"
+                    transform={`translate(${HEAD_CORNER.x} ${HEAD_CORNER.z}) rotate(${(-HEAD_CORNER_ROT * 180) / Math.PI})`}
+                />
                 <rect x={BOARD.x - 1.7} y={BOARD.z - 0.3} width={3.4} height={0.6} rx={0.2} fill="#2A2340" />
             </g>
             {games.map((g) => (

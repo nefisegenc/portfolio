@@ -54,7 +54,21 @@ const RiffGlyph = () => (
     </svg>
 );
 
-const GLYPHS = { bowling: BowlingGlyph, race: RaceGlyph, bugs: BugGlyph, riff: RiffGlyph };
+// A big head about to meet the bug ball.
+const HeadGlyph = () => (
+    <svg viewBox="0 0 48 48" width="46" height="46" aria-hidden="true">
+        <circle cx="17" cy="30" r="12" fill="#fff" />
+        <circle cx="19.5" cy="28" r="1.8" fill="#1C1730" />
+        <circle cx="25" cy="28" r="1.8" fill="#1C1730" />
+        <path d="M19 34c1.8 1.5 4.4 1.5 6.2 0" stroke="#1C1730" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+        <circle cx="35" cy="13" r="7" fill="#fff" />
+        <path d="M31.5 8v10M35 6v14M38.5 8v10" stroke="#0EA5E9" strokeWidth="1.6" />
+        <path d="M40.5 8.5l3.5-3.5M41.5 11.5l4.5-1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M24.5 17.5c1.5-2.8 3-4.3 5-5.3" stroke="#fff" strokeWidth="1.8" strokeDasharray="2 2.6" fill="none" strokeLinecap="round" />
+    </svg>
+);
+
+const GLYPHS = { bowling: BowlingGlyph, race: RaceGlyph, bugs: BugGlyph, riff: RiffGlyph, head: HeadGlyph };
 
 // How each game is played on a keyboard ("key." entries are translated).
 const CONTROLS = {
@@ -62,6 +76,7 @@ const CONTROLS = {
     race: ["WASD", "key.space"],
     bugs: ["WASD", "key.mouse"],
     riff: ["A S D F"],
+    head: ["← →", "↑", "key.space"],
 };
 
 const GameCard = ({ game, best, onPlay }) => {

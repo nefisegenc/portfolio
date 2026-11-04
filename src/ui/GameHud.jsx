@@ -10,7 +10,7 @@ import { arcadeLink, useArcade } from "../game/arcade/state";
 import { input } from "../game/input";
 import { isTouch } from "../game/utils";
 import { useT } from "../i18n";
-import { ChevronLeft, ChevronRight, CloseIcon, StarIcon } from "./icons";
+import { ArrowUpIcon, ChevronLeft, ChevronRight, CloseIcon, StarIcon } from "./icons";
 
 const Stat = ({ label, value, color }) => (
     <div className="text-center">
@@ -33,6 +33,24 @@ const Bar = ({ label, value, color }) => (
         </span>
     </div>
 );
+
+// Head to Head's teams, in shades that read on the light cards.
+const FRONT = "#9333EA";
+const BACK = "#16A34A";
+const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+// Power-ups running for the player, as little tags.
+const Powers = ({ powers }) => {
+    const t = useT();
+    if (!powers.coffee && !powers.wall && !powers.frozen) return null;
+    return (
+        <p className="flex gap-1 text-[10px] font-extrabold uppercase">
+            {powers.coffee && <span className="rounded bg-[#F59E0B] px-1">{t("head.chip.coffee")}</span>}
+            {powers.wall && <span className="rounded bg-[#F97316] px-1 text-white">{t("head.chip.wall")}</span>}
+            {powers.frozen && <span className="rounded bg-[#22D3EE] px-1">{t("head.chip.frozen")}</span>}
+        </p>
+    );
+};
 
 // A score sheet: each frame's marks over its running total.
 const BowlingSheet = ({ detail }) => {
@@ -135,6 +153,22 @@ const ScoreCard = ({ active }) => {
                 <div className="w-28 space-y-1">
                     <Bar label={t("game.crowd")} value={detail.rock} />
                     <Bar label={t("game.song")} value={detail.progress} color="#A78BFA" />
+                </div>
+            </>
+        );
+    } else if (active === "head" && detail) {
+        stats = (
+            <>
+                <Stat label="Frontend" value={detail.goals[0]} color={FRONT} />
+                <Stat
+                    label={detail.golden ? t("head.goldenShort") : t("game.time")}
+                    value={clock(detail.time)}
+                    color={detail.golden ? "#D97706" : detail.time <= 10 ? "#DC2626" : undefined}
+                />
+                <Stat label="Backend" value={detail.goals[1]} color={BACK} />
+                <div className="w-28 space-y-1">
+                    <Bar label="--force" value={detail.force} color={detail.force >= 1 ? "#EC4899" : "#A855F7"} />
+                    <Powers powers={detail.powers} />
                 </div>
             </>
         );
@@ -252,7 +286,25 @@ const Results = ({ active, result }) => {
                 {t(`game.${active}`)}
             </p>
             <p className="font-display text-sm font-bold text-ink-soft">{t("game.result")}</p>
-            <p className="font-display text-6xl font-extrabold leading-none tabular-nums">{formatScore(active, result.score)}</p>
+            {result.extra?.goals ? (
+                <>
+                    <p className="font-display text-6xl font-extrabold leading-none tabular-nums">
+                        <span style={{ color: FRONT }}>{result.extra.goals[0]}</span>
+                        <span className="text-ink/25"> – </span>
+                        <span style={{ color: BACK }}>{result.extra.goals[1]}</span>
+                    </p>
+                    <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">Frontend · Backend</p>
+                    <p
+                        className="mt-1 font-display text-lg font-extrabold"
+                        style={{ color: { win: "#22C55E", draw: "#D97706", loss: "#EF4444" }[result.extra.outcome] }}
+                    >
+                        {t(`head.${result.extra.outcome}`)}
+                        {result.extra.golden && result.extra.outcome !== "draw" && ` · ${t("head.goldenWin")}`}
+                    </p>
+                </>
+            ) : (
+                <p className="font-display text-6xl font-extrabold leading-none tabular-nums">{formatScore(active, result.score)}</p>
+            )}
             {result.extra?.stars !== undefined && (
                 <div className="mt-2">
                     {result.extra.failed ? (
@@ -356,6 +408,47 @@ const BowlingTouch = () => {
             </div>
             <ActionButton color="#8B5CF6">{t("game.throw")}</ActionButton>
         </div>
+    );
+};
+
+// Head to Head on touch screens: run left and right, jump, and kick.
+const HeadTouch = () => {
+    const t = useT();
+    return (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 flex items-end justify-between px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <div className="flex gap-3">
+                <HoldButton flag="left" label={t("game.left")}>
+                    <ChevronLeft size={26} />
+                </HoldButton>
+                <HoldButton flag="right" label={t("game.right")}>
+                    <ChevronRight size={26} />
+                </HoldButton>
+            </div>
+            <div className="flex items-end gap-3">
+                <HoldButton flag="forward" label={t("head.jump")}>
+                    <ArrowUpIcon size={26} />
+                </HoldButton>
+                <ActionButton color="#0EA5E9">{t("head.kick")}</ActionButton>
+            </div>
+        </div>
+    );
+};
+
+// Head to Head is played side-on, so phones held upright get a nudge to
+// turn sideways.
+const RotateHint = () => {
+    const t = useT();
+    const [upright, setUpright] = useState(() => window.innerHeight > window.innerWidth);
+    useEffect(() => {
+        const check = () => setUpright(window.innerHeight > window.innerWidth);
+        window.addEventListener("resize", check);
+        return () => window.removeEventListener("resize", check);
+    }, []);
+    if (!upright) return null;
+    return (
+        <p className="card pointer-events-none fixed inset-x-0 top-[248px] z-20 mx-auto w-fit px-3 py-1.5 text-xs font-bold text-ink-soft">
+            {t("head.rotate")}
+        </p>
     );
 };
 
@@ -544,6 +637,7 @@ const KEY_HELP = {
     race: [["W", "A", "S", "D"], ["key.space"]],
     bugs: [["W", "A", "S", "D"], ["key.mouse"]],
     riff: [FRET_KEYS],
+    head: [["←", "→"], ["↑"], ["key.space"]],
 };
 // Riff Rush's keys wear their frets' colours.
 const KEY_TINTS = { riff: LANE_COLORS };
@@ -620,6 +714,8 @@ export const GameHud = () => {
             {active === "bugs" && <HurtFlash />}
             {active === "riff" && <RiffJudge />}
             {active === "riff" && status === "playing" && isTouch && <RiffTouch />}
+            {active === "head" && status === "playing" && isTouch && <HeadTouch />}
+            {active === "head" && status !== "done" && isTouch && <RotateHint />}
             {active && status !== "done" && !isTouch && !riffUnderway && <KeyHelp active={active} />}
         </>
     );

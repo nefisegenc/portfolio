@@ -18,6 +18,7 @@ import {
     worldYaw,
 } from "../data/arcade";
 import { KartModel } from "./arcade/Props";
+import { kickAngle } from "./arcade/head/field";
 import { Blaster } from "./arcade/hunt/BugHunt";
 import { Guitar } from "./arcade/riff/Riff";
 import { arcadeLink, useArcade } from "./arcade/state";
@@ -85,7 +86,8 @@ const travelSpot = (id) => {
     }
     if (id === "plaza") return { x: SPAWN.x, z: SPAWN.z, rotY: SPAWN.yaw + Math.PI };
     const g = getGame(id);
-    const [x, z] = g ? [g.x, g.z] : toWorld(ENTRY.x, ENTRY.z - 4);
+    if (g) return { x: g.x, z: g.z, rotY: g.rotY };
+    const [x, z] = toWorld(ENTRY.x, ENTRY.z - 4);
     return { x, z, rotY: worldYaw(0, -1) };
 };
 
@@ -215,6 +217,9 @@ export const Player = () => {
             }
             moving = Math.hypot(s.vx, s.vz);
         }
+        // A game moving the player itself (Head to Head) says how they move.
+        const pose = arcadeLink.pose;
+        if (pose) moving = pose.speed;
         if (moving > 0.5 && canMove) store.markMoved();
 
         // Jump (the blaster's trigger shares the key, so not while hunting).
@@ -232,7 +237,7 @@ export const Player = () => {
 
         // Face the direction of travel, or the target while aiming (the kart steers itself).
         if (arcadeLink.aimYaw !== null && arcadeLink.aimYaw !== undefined) s.rotY = angleLerp(s.rotY, arcadeLink.aimYaw, damp(20, dt));
-        else if (!driving && moving > 0.3) s.rotY = angleLerp(s.rotY, Math.atan2(s.vx, s.vz), damp(12, dt));
+        else if (!driving && !pose && moving > 0.3) s.rotY = angleLerp(s.rotY, Math.atan2(s.vx, s.vz), damp(12, dt));
         group.current.rotation.y = s.rotY;
         // Blink for a moment after being hurt.
         arcadeLink.blink = Math.max(0, arcadeLink.blink - dt);
@@ -243,7 +248,7 @@ export const Player = () => {
         const stride = Math.min(moving / WALK_SPEED, 1.6);
         s.phase += dt * (4 + moving * 1.6);
         const swing = Math.sin(s.phase) * 0.7 * Math.min(stride, 1.2);
-        const airborne = s.y > 0.01;
+        const airborne = pose ? pose.air : s.y > 0.01;
         // A footstep every half walk cycle.
         const stepIndex = Math.floor(s.phase / Math.PI);
         if (stepIndex !== s.stepIndex) {
@@ -265,7 +270,7 @@ export const Player = () => {
                 w.el.rotation.x = kart.wheel;
                 if (w.front) w.el.rotation.y = kart.steer * 0.45;
             }
-        } else if (r.leftLeg) {
+        } else if (r.leftLeg && !pose?.frozen) {
             r.leftLeg.rotation.x = MathUtils.lerp(r.leftLeg.rotation.x, airborne ? -0.5 : swing, damp(14, dt));
             r.rightLeg.rotation.x = MathUtils.lerp(r.rightLeg.rotation.x, airborne ? 0.3 : -swing, damp(14, dt));
             r.leftArm.rotation.x = MathUtils.lerp(r.leftArm.rotation.x, airborne ? -2.4 : -swing * 0.9, damp(12, dt));
@@ -290,6 +295,18 @@ export const Player = () => {
                 r.body.rotation.x = Math.sin(arcadeLink.beat * Math.PI * 2) * 0.05;
             } else if (r.rightArm.rotation.z !== 0.22) {
                 r.rightArm.rotation.z = 0.22;
+            }
+            // Head to Head: kicks swing the right leg through, and a force
+            // shot to the face rocks you back.
+            if (pose?.kick > 0) r.rightLeg.rotation.x = kickAngle(pose.kick);
+            if (pose?.stun) r.body.rotation.x = -0.55;
+        }
+        // Head to Head is played with a big head.
+        if (r.head) {
+            const big = arcade.active === "head" ? 1.75 : 1;
+            if (r.head.scale.x !== big) {
+                r.head.scale.setScalar(big);
+                r.head.position.y = 1.6 + (big - 1) * 0.2;
             }
         }
 

@@ -116,14 +116,24 @@ export const BUG_PORTAL = { x: 5.6, z: -0.6 };
 // A little stage at the back of the island, Riff Rush's way in.
 export const RIFF_STAGE = { x: 0.8, z: -11.3 };
 
+// Head to Head's way in: a goal with the bug ball in front of it, facing
+// the middle of the island.
+export const HEAD_CORNER = { x: 8.9, z: -6.9 };
+export const HEAD_CORNER_ROT = Math.atan2(-HEAD_CORNER.x, -HEAD_CORNER.z);
+const toward = (d) => [HEAD_CORNER.x + Math.sin(HEAD_CORNER_ROT) * d, HEAD_CORNER.z + Math.cos(HEAD_CORNER_ROT) * d];
+const [HEAD_PAD_X, HEAD_PAD_Z] = toward(2.5);
+
 export const games = [
     { id: "bowling", color: "#8B5CF6", pad: { x: LANE.x, z: LANE.foulZ + 2.3 } },
     { id: "race", color: "#F97316", pad: { x: 2.4, z: 7.9 } },
     { id: "bugs", color: "#22C55E", pad: { x: BUG_PORTAL.x, z: BUG_PORTAL.z + 3.2 } },
     { id: "riff", color: "#EC4899", pad: { x: RIFF_STAGE.x, z: RIFF_STAGE.z + 2.7 } },
+    // Facing the goal rather than the back of the island.
+    { id: "head", color: "#0EA5E9", pad: { x: HEAD_PAD_X, z: HEAD_PAD_Z }, face: [-Math.sin(HEAD_CORNER_ROT), -Math.cos(HEAD_CORNER_ROT)] },
 ].map((g) => {
     const [x, z] = toWorld(g.pad.x, g.pad.z);
-    return { ...g, x, z };
+    // `rotY`: which way to face when arriving on the pad.
+    return { ...g, x, z, rotY: worldYaw(...(g.face ?? [0, -1])) };
 });
 
 export const ARCADE_LAMPS = [
@@ -168,6 +178,12 @@ const local = [
     { x: PARKED_KART.x, z: PARKED_KART.z, r: 0.75 },
     { x: RACE_SIGN.x, z: RACE_SIGN.z, r: 0.4 },
     ...[-1, 0, 1].map((s) => ({ x: RIFF_STAGE.x + s * 1.1, z: RIFF_STAGE.z, r: 0.85 })),
+    // The goal's posts and net.
+    ...[-1, 0, 1].map((s) => {
+        const [x, z] = toward(-0.35);
+        const across = HEAD_CORNER_ROT + Math.PI / 2;
+        return { x: x + Math.sin(across) * s * 0.9, z: z + Math.cos(across) * s * 0.9, r: 0.45 };
+    }),
 ];
 
 export const arcadeColliders = [

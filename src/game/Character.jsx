@@ -30,8 +30,8 @@ const Eye = ({ x }) => (
     </group>
 );
 
-const Head = () => (
-    <group position={[0, 1.6, 0]}>
+const Head = ({ headRef }) => (
+    <group ref={headRef} position={[0, 1.6, 0]}>
         <mesh scale={[1, 1.1, 1]}>
             <sphereGeometry args={[0.18, 32, 24]} />
             <Skin />
@@ -140,7 +140,7 @@ export const Character = ({ rig, tool, children }) => {
     };
     return (
         <group ref={set("body")}>
-            <Head />
+            <Head headRef={set("head")} />
             <mesh position={[0, 1.15, 0]} scale={[1.1, 1, 0.7]}>
                 <capsuleGeometry args={[0.12, 0.25, 10, 16]} />
                 <meshStandardMaterial color={OUTFIT} />

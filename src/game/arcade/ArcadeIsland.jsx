@@ -16,6 +16,8 @@ import {
     BRIDGE_START,
     BUG_PORTAL,
     ENTRY,
+    HEAD_CORNER,
+    HEAD_CORNER_ROT,
     PAD_RADIUS,
     PARKED_KART,
     RACE_SIGN,
@@ -31,6 +33,7 @@ import { useT } from "../../i18n";
 import { TopLayer, Underside } from "../Island";
 import { Ball, Box, Cyl, FONT, GlowMat, Shadowed } from "../parts";
 import { formatScore } from "./format";
+import { BugBallModel } from "./head/HeadBall";
 import { KartModel } from "./Props";
 import { Guitar } from "./riff/Riff";
 import { useArcade } from "./state";
@@ -179,19 +182,19 @@ const ScoreBoard = () => {
                 {[-1.45, 1.45].map((x) => (
                     <Box key={x} args={[0.2, 2.4, 0.2]} position={[x, 1.2, -0.05]} color="#3B3350" />
                 ))}
-                <Box args={[3.5, 2.3, 0.26]} position={[0, 2.95, 0]} color="#1C1730" />
+                <Box args={[3.5, 2.7, 0.26]} position={[0, 3.05, 0]} color="#1C1730" />
             </Shadowed>
-            <Box args={[3.62, 0.08, 0.3]} position={[0, 4.12, 0]}>
+            <Box args={[3.62, 0.08, 0.3]} position={[0, 4.42, 0]}>
                 <GlowMat color={ARCADE_COLOR} strength={2} />
             </Box>
-            <Text font={FONT} fontSize={0.34} position={[0, 3.75, 0.17]} anchorY="middle">
+            <Text font={FONT} fontSize={0.34} position={[0, 4.05, 0.17]} anchorY="middle">
                 {t("arcade.board")}
                 <GlowMat color="#FACC15" strength={1.6} />
             </Text>
             {games.map((g, i) => (
                 <BoardLine
                     key={g.id}
-                    y={3.28 - i * 0.42}
+                    y={3.58 - i * 0.4}
                     color={g.color}
                     label={t(`game.${g.id}`)}
                     value={best[g.id] === undefined ? "—" : formatScore(g.id, best[g.id])}
@@ -263,6 +266,7 @@ const WALKWAYS = [
     [0, 5.2, games[0].pad.x + 0.8, games[0].pad.z],
     [0, 2.8, games[2].pad.x - 0.6, games[2].pad.z + 0.4],
     [BOARD.x, BOARD.z - 0.6, games[3].pad.x, games[3].pad.z + 0.5],
+    [BOARD.x + 1.2, BOARD.z - 0.3, games[4].pad.x - 0.5, games[4].pad.z + 0.3],
 ];
 
 const Walkways = () =>
@@ -363,6 +367,46 @@ const RiffCorner = () => {
     );
 };
 
+// Head to Head's way in: a goal with the bug ball waiting in front of it.
+const HeadCorner = () => {
+    const t = useT();
+    const net = (args, position, rotation = [0, 0, 0]) => (
+        <mesh position={position} rotation={rotation}>
+            <planeGeometry args={args} />
+            <meshBasicMaterial color="#E0F2FE" wireframe transparent opacity={0.5} />
+        </mesh>
+    );
+    return (
+        <group position={[HEAD_CORNER.x, 0, HEAD_CORNER.z]} rotation-y={HEAD_CORNER_ROT}>
+            <Shadowed>
+                {[-1, 1].map((s) => (
+                    <group key={s}>
+                        <Cyl args={[0.06, 0.06, 1.6, 8]} position={[s * 1.1, 0.8, 0]}>
+                            <GlowMat color="#0EA5E9" strength={1.6} />
+                        </Cyl>
+                        <Cyl args={[0.04, 0.04, 1.6, 6]} position={[s * 1.1, 0.8, -0.8]} color="#CBD5E1" />
+                    </group>
+                ))}
+                <Cyl args={[0.06, 0.06, 2.32, 8]} position={[0, 1.6, 0]} rotation-z={Math.PI / 2}>
+                    <GlowMat color="#0EA5E9" strength={1.6} />
+                </Cyl>
+            </Shadowed>
+            {net([2.2, 1.6, 11, 8], [0, 0.8, -0.8])}
+            {net([2.2, 0.8, 11, 4], [0, 1.6, -0.4], [-Math.PI / 2, 0, 0])}
+            {[-1, 1].map((s) => (
+                <group key={s}>{net([0.8, 1.6, 4, 8], [s * 1.1, 0.8, -0.4], [0, Math.PI / 2, 0])}</group>
+            ))}
+            <group position={[0.25, 0.3, 0.95]} rotation-y={-0.6}>
+                <BugBallModel />
+            </group>
+            <Text font={FONT} fontSize={0.42} position={[0, 2.25, 0]} anchorY="middle">
+                {t("game.head").toUpperCase()}
+                <GlowMat color="#0EA5E9" strength={2.4} />
+            </Text>
+        </group>
+    );
+};
+
 // Children are placed in arcade space.
 export const ArcadeIsland = ({ children }) => (
     <>
@@ -377,6 +421,7 @@ export const ArcadeIsland = ({ children }) => (
             <RaceCorner />
             <BugPortal />
             <RiffCorner />
+            <HeadCorner />
             {games.map((g) => (
                 <Pad key={g.id} game={g} />
             ))}

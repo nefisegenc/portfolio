@@ -3,16 +3,16 @@
 import { create } from "zustand";
 import { track } from "../../analytics";
 import { useStore } from "../../store";
-import { getGame, worldYaw } from "../../data/arcade";
+import { getGame } from "../../data/arcade";
 import { setMusicTrack } from "../sound";
-import { bowlingMusic, countIn, huntMusic, raceMusic, silenceLoops } from "./audio";
+import { bowlingMusic, countIn, headMusic, huntMusic, raceMusic, silenceLoops } from "./audio";
 
 // Riff Rush starts its band itself, on the beat.
-const MUSIC = { bowling: bowlingMusic, race: raceMusic, bugs: huntMusic, riff: countIn };
-// Games played under black light switch the island to night while they run.
-const NEON = new Set(["bowling", "bugs", "riff"]);
+const MUSIC = { bowling: bowlingMusic, race: raceMusic, bugs: huntMusic, riff: countIn, head: headMusic };
+// Games played under black light (or floodlights) switch the island to night while they run.
+const NEON = new Set(["bowling", "bugs", "riff", "head"]);
 // Games played away from the island, which take the player there and back.
-const AWAY = new Set(["race", "bugs", "riff"]);
+const AWAY = new Set(["race", "bugs", "riff", "head"]);
 let restoreDay = false;
 
 // Bumped whenever a game's scoring changes so old records don't carry over
@@ -82,6 +82,9 @@ export const arcadeLink = {
     fret: null,
     strum: 0,
     beat: 0,
+    // How a game that moves the player itself wants them animated (Head to
+    // Head): { speed, air, kick (0–1 through a kick), stun, frozen }.
+    pose: null,
 };
 
 const releasePlayer = () => {
@@ -98,6 +101,7 @@ const releasePlayer = () => {
     arcadeLink.push = null;
     arcadeLink.blink = 0;
     arcadeLink.snap = false;
+    arcadeLink.pose = null;
 };
 
 let messageId = 0;
@@ -183,7 +187,7 @@ export const useArcade = create((set, get) => ({
         // Back to the game's pad on the arcade from wherever it was played.
         if (AWAY.has(active)) {
             const game = getGame(active);
-            arcadeLink.teleport = { x: game.x, z: game.z, rotY: worldYaw(0, -1) };
+            arcadeLink.teleport = { x: game.x, z: game.z, rotY: game.rotY };
         }
         silenceLoops();
         setMusicTrack(null);
