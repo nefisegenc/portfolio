@@ -1,6 +1,6 @@
 // HUD for the arcade games: score card, countdown, pop-up messages, the
 // results card and touch buttons for bowling.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { getGame } from "../data/arcade";
 import { BOWLING_FRAMES, frameTotals, rollMarks } from "../game/arcade/bowlingScore";
@@ -108,13 +108,8 @@ const ScoreCard = ({ active }) => {
     } else if (active === "race") {
         stats = (
             <>
-                <Stat label={t("game.time")} value={`${time.toFixed(1)}s`} color={game.color} />
-                {detail && (
-                    <Stat
-                        label={t("game.lapOf", { n: Math.min(detail.lap, detail.laps), total: detail.laps })}
-                        value={`${(detail.checkpoint % 8) + 1}/8`}
-                    />
-                )}
+                {detail && <Stat label={t("game.place")} value={`${detail.place}/${detail.racers}`} color={game.color} />}
+                {detail && <Stat label={t("game.lapOf", { n: detail.lap, total: detail.laps })} value={`${time.toFixed(1)}s`} />}
             </>
         );
     } else {
@@ -217,6 +212,11 @@ const Results = ({ active, result }) => {
             </p>
             <p className="font-display text-sm font-bold text-ink-soft">{t("game.result")}</p>
             <p className="font-display text-6xl font-extrabold leading-none tabular-nums">{formatScore(active, result.score)}</p>
+            {result.extra?.place && (
+                <p className="mt-1 font-display text-lg font-extrabold" style={{ color: game.color }}>
+                    {t("game.finishedPlace", { place: t(`place.${result.extra.place}`) })}
+                </p>
+            )}
             {result.record ? (
                 <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-sun px-3 py-1 font-display font-bold">
                     <StarIcon size={16} /> {t("game.newBest")}
@@ -296,10 +296,73 @@ const BowlingTouch = () => {
     );
 };
 
+// The race's speedometer, nitro tank and a map of the circuit with every
+// kart on it, all redrawn every frame straight from the game. (The circuit's
+// outline comes from the game too, which keeps three.js out of this bundle.)
+const RaceGauges = () => {
+    const speed = useRef();
+    const nitro = useRef();
+    const dots = useRef();
+    const [map, setMap] = useState(null);
+    const t = useT();
+    useEffect(() => {
+        let frame;
+        const tick = () => {
+            const race = arcadeLink.race;
+            if (race) setMap((m) => m ?? race.map);
+            if (race && speed.current) {
+                speed.current.textContent = Math.round(race.speed * 3.6);
+                nitro.current.style.width = `${Math.round(race.nitro * 100)}%`;
+                race.dots.forEach((d, i) => {
+                    const el = dots.current?.children[i];
+                    if (el) el.setAttribute("transform", `translate(${d.x.toFixed(1)} ${d.z.toFixed(1)})`);
+                });
+            }
+            frame = requestAnimationFrame(tick);
+        };
+        tick();
+        return () => cancelAnimationFrame(frame);
+    }, []);
+    const colors = ["#22C55E", "#3B82F6", "#EAB308", "#F97316"];
+    return (
+        <div className="pointer-events-none fixed bottom-6 right-6 z-20 flex items-end gap-3 max-md:bottom-[170px] max-md:right-3">
+            <div className="card px-4 py-2 text-center">
+                <p className="font-display text-4xl font-extrabold leading-none tabular-nums">
+                    <span ref={speed}>0</span>
+                </p>
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">{t("game.speed")}</p>
+                <div className="mt-2 h-2.5 w-28 overflow-hidden rounded-full bg-ink/10">
+                    <div ref={nitro} className="h-full rounded-full bg-gradient-to-r from-[#22D3EE] to-[#3B82F6]" />
+                </div>
+                <p className="mt-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#2563EB]">{t("game.nitro")}</p>
+            </div>
+            <div className="card hidden p-2 md:block">
+                <svg viewBox={map?.viewBox ?? "0 0 1 1"} className="h-28 w-36">
+                    {map && <path d={map.d} fill="none" stroke="#2A2340" strokeOpacity="0.25" strokeWidth="7" strokeLinejoin="round" />}
+                    <g ref={dots}>
+                        {colors.map((c, i) => (
+                            <circle key={i} r={i === 3 ? 4.5 : 3.5} fill={c} stroke="#fff" strokeWidth="1.5" />
+                        ))}
+                    </g>
+                </svg>
+            </div>
+        </div>
+    );
+};
+
+const RaceTouch = () => {
+    const t = useT();
+    return (
+        <div className="pointer-events-none fixed bottom-0 right-0 z-10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <ActionButton color="#2563EB">{t("game.nitro")}</ActionButton>
+        </div>
+    );
+};
+
 const KEY_HELP = {
     bowling: [["←", "→"], ["key.space"]],
     hook: [["←", "→"]],
-    race: [["W", "A", "S", "D"]],
+    race: [["W", "A", "S", "D"], ["key.space"]],
     bugs: [["W", "A", "S", "D"], ["key.space"]],
 };
 
@@ -361,6 +424,8 @@ export const GameHud = () => {
             <AnimatePresence>{status === "done" && result && <Results key="results" active={active} result={result} />}</AnimatePresence>
             {active === "bowling" && status === "playing" && isTouch && <BowlingTouch />}
             {active === "bowling" && <PowerMeter />}
+            {active === "race" && status !== "done" && <RaceGauges />}
+            {active === "race" && status === "playing" && isTouch && <RaceTouch />}
             {active && status !== "done" && !isTouch && <KeyHelp active={active} />}
         </>
     );

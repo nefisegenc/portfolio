@@ -19,10 +19,10 @@ const Wheel = () => (
 
 // Low go-kart, nose towards +z. `wheels` collects the wheel groups so the
 // controller can spin them and steer the front pair.
-export const KartModel = ({ wheels, ...props }) => (
+export const KartModel = ({ wheels, color = BODY, ...props }) => (
     <Shadowed {...props}>
-        <Box args={[0.86, 0.14, 1.45]} position={[0, 0.2, 0]} color={BODY} />
-        <Box args={[0.62, 0.16, 0.5]} position={[0, 0.3, 0.42]} color={BODY} />
+        <Box args={[0.86, 0.14, 1.45]} position={[0, 0.2, 0]} color={color} />
+        <Box args={[0.62, 0.16, 0.5]} position={[0, 0.3, 0.42]} color={color} />
         <Box args={[1.0, 0.12, 0.22]} position={[0, 0.2, 0.8]} color={TRIM} />
         <Box args={[0.54, 0.4, 0.1]} position={[0, 0.45, -0.38]} color={TRIM} />
         <Box args={[0.4, 0.22, 0.3]} position={[0, 0.35, -0.62]} color="#3B3350" />
@@ -30,7 +30,7 @@ export const KartModel = ({ wheels, ...props }) => (
         {[-0.3, 0.3].map((x) => (
             <Box key={x} args={[0.05, 0.28, 0.05]} position={[x, 0.52, -0.72]} color={TRIM} />
         ))}
-        <Box args={[0.95, 0.05, 0.24]} position={[0, 0.67, -0.74]} color={BODY} />
+        <Box args={[0.95, 0.05, 0.24]} position={[0, 0.67, -0.74]} color={color} />
         {/* Steering column and wheel */}
         <Cyl args={[0.025, 0.025, 0.36, 6]} position={[0, 0.45, 0.32]} rotation-x={-0.9} color={TRIM} />
         <mesh position={[0, 0.58, 0.22]} rotation-x={-0.9}>
@@ -53,6 +53,24 @@ export const KartModel = ({ wheels, ...props }) => (
             </group>
         ))}
     </Shadowed>
+);
+
+// A rival driver: suit and helmet, sitting where the player's character sits.
+export const Driver = ({ color }) => (
+    <group position={[0, 0.36, -0.12]}>
+        <mesh position-y={0.3}>
+            <capsuleGeometry args={[0.17, 0.3, 6, 10]} />
+            <meshStandardMaterial color={color} />
+        </mesh>
+        <mesh position-y={0.78}>
+            <sphereGeometry args={[0.2, 16, 12]} />
+            <meshStandardMaterial color="#F8FAFC" roughness={0.3} />
+        </mesh>
+        <mesh position={[0, 0.78, 0.12]} scale={[1, 0.55, 0.6]}>
+            <sphereGeometry args={[0.16, 14, 10]} />
+            <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.4} />
+        </mesh>
+    </group>
 );
 
 // A toy mallet held in the hand: the handle hangs on from the arm, the head

@@ -3,12 +3,15 @@
 import { create } from "zustand";
 import { track } from "../../analytics";
 import { useStore } from "../../store";
+import { getGame, worldYaw } from "../../data/arcade";
 import { setMusicTrack } from "../sound";
 import { bowlingMusic, huntMusic, raceMusic, silenceLoops } from "./audio";
 
 const MUSIC = { bowling: bowlingMusic, race: raceMusic, bugs: huntMusic };
 // Games played under black light switch the island to night while they run.
 const NEON = new Set(["bowling", "bugs"]);
+// Games played away from the island, which take the player there and back.
+const AWAY = new Set(["race"]);
 let restoreDay = false;
 
 // v2: the race became a three-lap kart race, so older run times don't compare.
@@ -49,6 +52,12 @@ export const arcadeLink = {
     holding: false,
     // A 0–1 gauge the HUD shows while it is set (bowling power).
     meter: null,
+    // Where the sun's shadows should centre, for games away from the islands.
+    focus: null,
+    // The race kart for the player controller: { speed, steer, wheel }.
+    kart: null,
+    // Live race readouts for the HUD: { speed, nitro, dots }.
+    race: null,
     // Where the hammer just landed in Bug Smash: { x, z }, read once.
     hit: null,
     // Bugs that are up right now, for the hammer's aim assist: [{ x, z }].
@@ -59,6 +68,9 @@ const releasePlayer = () => {
     arcadeLink.lock = null;
     arcadeLink.camera = null;
     arcadeLink.meter = null;
+    arcadeLink.focus = null;
+    arcadeLink.kart = null;
+    arcadeLink.race = null;
     arcadeLink.hit = null;
     arcadeLink.targets = [];
 };
@@ -111,7 +123,13 @@ export const useArcade = create((set, get) => ({
         });
     },
     quit: () => {
+        const { active } = get();
         releasePlayer();
+        // Back to the game's pad on the arcade from wherever it was played.
+        if (AWAY.has(active)) {
+            const game = getGame(active);
+            arcadeLink.teleport = { x: game.x, z: game.z, rotY: worldYaw(0, -1) };
+        }
         silenceLoops();
         setMusicTrack(null);
         const island = useStore.getState();
@@ -136,7 +154,8 @@ export const useArcade = create((set, get) => ({
             set({ best: next });
         }
         track("Game Finished", { game: active });
-        releasePlayer();
+        // Games away from the island keep the player there behind the results.
+        if (!AWAY.has(active)) releasePlayer();
         silenceLoops();
         set({ status: "done", score, result: { score, record, previous: best[active], extra } });
     },

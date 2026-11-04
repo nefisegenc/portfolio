@@ -78,8 +78,10 @@ const Progress = () => {
     );
 };
 
-// During a game, small screens keep only the minimap so the score card fits.
-const TopRight = ({ helpOpen, onHelp, gameActive }) => {
+// During a game, small screens keep only the minimap so the score card fits;
+// the race, far from the islands, has its own map instead.
+const TopRight = ({ helpOpen, onHelp, game }) => {
+    const gameActive = Boolean(game);
     const openPanel = useStore((s) => s.openPanel);
     const night = useStore((s) => s.night);
     const toggleNight = useStore((s) => s.toggleNight);
@@ -93,7 +95,7 @@ const TopRight = ({ helpOpen, onHelp, gameActive }) => {
             <button
                 onClick={() => openPanel({ type: "map" })}
                 aria-label={t("hud.openMap")}
-                className="card relative aspect-square overflow-hidden rounded-full bg-[#BFE3F5] p-1.5 transition hover:scale-[1.03]"
+                className={`card relative aspect-square overflow-hidden rounded-full bg-[#BFE3F5] p-1.5 transition hover:scale-[1.03] ${game === "race" ? "invisible" : ""}`}
             >
                 <IslandMap />
                 <span className="keycap absolute bottom-2 right-3 hidden md:inline-grid">M</span>
@@ -351,7 +353,7 @@ export const Hud = () => {
                 <div className="pointer-events-auto">
                     <PlayerBadge />
                 </div>
-                <TopRight helpOpen={helpOpen} onHelp={() => toggleHelp(!helpOpen)} gameActive={Boolean(game)} />
+                <TopRight helpOpen={helpOpen} onHelp={() => toggleHelp(!helpOpen)} game={game} />
             </div>
             <InteractPrompt />
             {!isTouch && <ControlsHint open={!panel && !game && helpOpen} onClose={() => toggleHelp(false)} />}

@@ -110,17 +110,6 @@ export const LANE = {
     length: 10.2,
 };
 
-export const TRACK = { radius: 11.5, halfWidth: 1.5, gates: 8, laps: 3 };
-export const trackPoint = (angle, offset = 0) => [
-    Math.sin(angle) * (TRACK.radius + offset),
-    Math.cos(angle) * (TRACK.radius + offset),
-];
-// Gates sit half a step off the entrance axis so the path in stays clear.
-export const gateAngle = (i) => ((i + 0.5) / TRACK.gates) * Math.PI * 2;
-// Boost pads sit between gates, one in each quarter of the lap.
-export const BOOST_ANGLES = [1, 3, 5, 7].map((k) => (k / TRACK.gates) * Math.PI * 2);
-export const BOOST_LENGTH = 1.6;
-
 export const BUGS = {
     x: 5.6,
     z: -1.2,
@@ -162,8 +151,10 @@ export const ARCADE_TREES = [
 export const getGame = (id) => games.find((g) => g.id === id);
 export const PAD_RADIUS = 1.3;
 
-// The race kart waits beside its pad when nobody is driving it.
+// The race kart waits beside its pad when nobody is driving it, under a
+// sign pointing out to the Sky Circuit.
 export const PARKED_KART = { x: 4.8, z: 7.2, rot: -0.6 };
+export const RACE_SIGN = { x: 6.6, z: 9.4, rot: -0.9 };
 
 // Solid things on the arcade, in world space.
 const local = [
@@ -183,20 +174,9 @@ const local = [
         const a = (i / 16) * Math.PI * 2 + Math.PI / 8 + Math.PI / 16;
         return { x: BUGS.x + Math.sin(a) * BUGS.fence, z: BUGS.z + Math.cos(a) * BUGS.fence, r: 0.18 };
     }),
-    // Gate posts.
-    ...Array.from({ length: TRACK.gates }, (_, i) =>
-        [-1, 1].map((s) => {
-            const [x, z] = trackPoint(gateAngle(i), s * (TRACK.halfWidth + 0.2));
-            return { x, z, r: 0.16 };
-        })
-    ).flat(),
     { x: PARKED_KART.x, z: PARKED_KART.z, r: 0.75 },
+    { x: RACE_SIGN.x, z: RACE_SIGN.z, r: 0.4 },
 ];
-
-export const boostPads = BOOST_ANGLES.map((a) => {
-    const [x, z] = toWorld(...trackPoint(a));
-    return { x, z };
-});
 
 export const arcadeColliders = [
     ...local.map((c) => {

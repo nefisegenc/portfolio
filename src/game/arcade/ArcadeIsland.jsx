@@ -16,6 +16,8 @@ import {
     BRIDGE_START,
     ENTRY,
     PAD_RADIUS,
+    PARKED_KART,
+    RACE_SIGN,
     SIGNPOST,
     bridgeDir,
     bridgePoint,
@@ -27,6 +29,7 @@ import { useT } from "../../i18n";
 import { TopLayer, Underside } from "../Island";
 import { Ball, Box, Cyl, FONT, GlowMat, Shadowed } from "../parts";
 import { formatScore } from "./format";
+import { KartModel } from "./Props";
 import { useArcade } from "./state";
 
 const WOOD = "#8B5E3C";
@@ -272,6 +275,27 @@ const Walkways = () =>
         );
     });
 
+// The race's kart waits by its pad under a sign pointing to the Sky Circuit.
+const RaceCorner = () => {
+    const t = useT();
+    const racing = useArcade((s) => s.active === "race");
+    return (
+        <group>
+            {!racing && <KartModel position={[PARKED_KART.x, 0, PARKED_KART.z]} rotation-y={PARKED_KART.rot} />}
+            <group position={[RACE_SIGN.x, 0, RACE_SIGN.z]} rotation-y={RACE_SIGN.rot}>
+                <Shadowed>
+                    <Box args={[0.16, 2.6, 0.16]} position={[0, 1.3, 0]} color="#1C1730" />
+                    <Box args={[2.4, 0.9, 0.12]} position={[0, 2.4, 0]} color="#1C1730" />
+                </Shadowed>
+                <Text font={FONT} fontSize={0.42} position={[0, 2.42, 0.07]} anchorY="middle">
+                    {t("race.gp")}
+                    <GlowMat color="#F97316" strength={2.4} />
+                </Text>
+            </group>
+        </group>
+    );
+};
+
 // Children are placed in arcade space.
 export const ArcadeIsland = ({ children }) => (
     <>
@@ -283,6 +307,7 @@ export const ArcadeIsland = ({ children }) => (
             <Walkways />
             <Arch />
             <ScoreBoard />
+            <RaceCorner />
             {games.map((g) => (
                 <Pad key={g.id} game={g} />
             ))}

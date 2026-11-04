@@ -10,7 +10,6 @@ import {
     BRIDGE_START,
     BUGS,
     LANE,
-    TRACK,
     arcadePath,
     bridgeDir,
     bridgePoint,
@@ -271,7 +270,6 @@ const ArcadeMap = ({ detailed, onSelect }) => {
             <g transform={place}>
                 <path d={shape} fill="#9CCB6B" stroke="#76AD50" strokeWidth={0.8 * s} />
                 <line x1={0} y1={ARCADE_RADIUS} x2={BOARD.x} y2={BOARD.z} stroke="#E4CFA6" strokeWidth={1.5} strokeLinecap="round" />
-                <circle r={TRACK.radius} fill="none" stroke="#D2694B" strokeWidth={TRACK.halfWidth * 2} />
                 <rect
                     x={LANE.x - LANE.halfWidth - LANE.gutter - 0.2}
                     y={LANE.foulZ - LANE.length}
