@@ -1,5 +1,5 @@
-// Bug Smash: bugs pop out of nine holes; step on them before they hide.
-// Golden bugs are worth three. Thirty seconds on the clock.
+// Bug Smash: bugs pop out of nine holes; whack them with the hammer before
+// they hide. Golden bugs are worth three. Thirty seconds on the clock.
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
@@ -15,7 +15,7 @@ const GREEN = "#22C55E";
 const RISE = 0.14;
 const HIDE = 0.16;
 const SQUASH = 0.35;
-const STOMP_REACH = 0.62;
+const HIT_RADIUS = 0.65;
 
 const BugModel = ({ golden }) => {
     const shell = golden ? "#FACC15" : "#EF4444";
@@ -128,6 +128,11 @@ const Hole = ({ x, z }) => (
     </group>
 );
 
+const worldHoles = bugHoles.map((h) => {
+    const [x, z] = toWorld(h.x, h.z);
+    return { x, z };
+});
+
 const emptyHoles = () => bugHoles.map(() => ({ state: "empty", t: 0, life: 0, golden: false }));
 
 export const BugSmash = () => {
@@ -148,6 +153,7 @@ export const BugSmash = () => {
         const rotY = worldYaw(0, -1);
         arcadeLink.teleport = { x, z, rotY };
         arcadeLink.lock = { x, z, rotY };
+        arcadeLink.hit = null;
         game.current = { count: COUNTDOWN, elapsed: 0, score: 0, spawn: 0.3, shown: -1 };
         playSound("beep");
         useArcade.getState().update({ time: BUGS.duration });
@@ -188,21 +194,30 @@ export const BugSmash = () => {
                     if (free.length) {
                         const i = free[Math.floor(Math.random() * free.length)];
                         const isGolden = Math.random() < 0.12;
-                        list[i] = { state: "rising", t: 0, life: Math.max(0.75, 1.45 - g.elapsed * 0.022), golden: isGolden };
+                        list[i] = { state: "rising", t: 0, life: Math.max(0.9, 1.7 - g.elapsed * 0.025), golden: isGolden };
                     }
                     g.spawn = 0.35 + Math.random() * 0.45;
                 }
-                // Stomp check against the player.
-                list.forEach((h, i) => {
-                    if (h.state !== "rising" && h.state !== "up") return;
-                    if (Math.hypot(px - local[i].x, pz - local[i].z) > STOMP_REACH) return;
-                    h.state = "squash";
-                    h.t = 0;
-                    g.score += h.golden ? 3 : 1;
-                    playSound("smash", h.golden);
-                    if (h.golden) store.say("game.golden", null, "#FACC15");
-                    store.update({ score: g.score });
-                });
+                // Where the hammer landed, if it just did.
+                const hit = arcadeLink.hit;
+                arcadeLink.hit = null;
+                if (hit) {
+                    const [hx, hz] = toLocal(hit.x, hit.z);
+                    let smashed = 0;
+                    list.forEach((h, i) => {
+                        if (h.state !== "rising" && h.state !== "up") return;
+                        if (Math.hypot(hx - local[i].x, hz - local[i].z) > HIT_RADIUS) return;
+                        h.state = "squash";
+                        h.t = 0;
+                        smashed += 1;
+                        g.score += h.golden ? 3 : 1;
+                        playSound("smash", h.golden);
+                        if (h.golden) store.say("game.golden", null, "#FACC15");
+                    });
+                    if (smashed) store.update({ score: g.score });
+                    else playSound("whiff");
+                }
+                arcadeLink.targets = worldHoles.filter((_, i) => list[i].state === "rising" || list[i].state === "up");
             }
         }
 

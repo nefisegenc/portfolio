@@ -307,9 +307,10 @@ export const Bowling = () => {
         if (g) {
             if (g.phase === "aim") {
                 const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0) + input.joystick.x;
-                g.aimU = Math.max(-AIM_RANGE, Math.min(AIM_RANGE, g.aimU + dir * 1.1 * dt));
+                g.aimU = Math.max(-AIM_RANGE, Math.min(AIM_RANGE, g.aimU + dir * 1.4 * dt));
                 g.aimT += dt;
-                g.angle = Math.sin(g.aimT * 2.3) * 0.1;
+                // The arrow swings quickly, and a little quicker every frame.
+                g.angle = Math.sin(g.aimT * (3.6 + g.frame * 0.7)) * 0.12;
                 b.u = g.aimU + 0.22;
                 b.v = -0.5;
                 const [px, pz] = toWorldLane(g.aimU, -0.85);

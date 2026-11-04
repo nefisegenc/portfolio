@@ -3,7 +3,8 @@
 import { create } from "zustand";
 import { track } from "../../analytics";
 
-const BEST_KEY = "nefise-island:arcade-best";
+// v2: the race became a three-lap kart race, so older run times don't compare.
+const BEST_KEY = "nefise-island:arcade-best-v2";
 
 const loadBest = () => {
     try {
@@ -36,6 +37,17 @@ export const arcadeLink = {
     teleport: null,
     // Set by the HUD's action button (throw, in bowling) until a game reads it.
     action: false,
+    // Where the hammer just landed in Bug Smash: { x, z }, read once.
+    hit: null,
+    // Bugs that are up right now, for the hammer's aim assist: [{ x, z }].
+    targets: [],
+};
+
+const releasePlayer = () => {
+    arcadeLink.lock = null;
+    arcadeLink.camera = null;
+    arcadeLink.hit = null;
+    arcadeLink.targets = [];
 };
 
 let messageId = 0;
@@ -80,8 +92,7 @@ export const useArcade = create((set, get) => ({
         });
     },
     quit: () => {
-        arcadeLink.lock = null;
-        arcadeLink.camera = null;
+        releasePlayer();
         set({ active: null, status: "idle", message: null, result: null, detail: null });
     },
     update: (patch) => set(patch),
@@ -100,8 +111,7 @@ export const useArcade = create((set, get) => ({
             set({ best: next });
         }
         track("Game Finished", { game: active });
-        arcadeLink.lock = null;
-        arcadeLink.camera = null;
+        releasePlayer();
         set({ status: "done", score, result: { score, record, previous: best[active] } });
     },
 }));

@@ -302,18 +302,23 @@ const Joystick = () => {
     );
 };
 
-const MobileControls = () => {
+// The right-hand button jumps, swings the hammer in Bug Smash, and goes
+// away in the kart, where the joystick does all the driving.
+const MobileControls = ({ game }) => {
     const t = useT();
+    const hammer = game === "bugs";
     return (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 flex items-end justify-between px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <Joystick />
-            <button
-                aria-label={t("hud.jump")}
-                className="pointer-events-auto mb-4 grid h-16 w-16 touch-none place-items-center rounded-full border-[3px] border-white bg-paper text-ink shadow-[0_4px_0_rgb(42_35_64/0.25)] active:translate-y-1"
-                onPointerDown={() => (input.jump = true)}
-            >
-                <ArrowUpIcon size={26} />
-            </button>
+            {game !== "race" && (
+                <button
+                    aria-label={hammer ? t("game.hit") : t("hud.jump")}
+                    className={`pointer-events-auto mb-4 grid h-16 w-16 touch-none place-items-center rounded-full border-[3px] border-white shadow-[0_4px_0_rgb(42_35_64/0.25)] active:translate-y-1 ${hammer ? "bg-[#22C55E] font-display text-lg font-extrabold text-white" : "bg-paper text-ink"}`}
+                    onPointerDown={() => (input.jump = true)}
+                >
+                    {hammer ? t("game.hit") : <ArrowUpIcon size={26} />}
+                </button>
+            )}
         </div>
     );
 };
@@ -350,7 +355,7 @@ export const Hud = () => {
             </div>
             <InteractPrompt />
             {!isTouch && <ControlsHint open={!panel && !game && helpOpen} onClose={() => toggleHelp(false)} />}
-            {isTouch && !panel && !bowling && <MobileControls />}
+            {isTouch && !panel && !bowling && <MobileControls game={game} />}
             <GameHud />
         </motion.div>
     );

@@ -97,8 +97,9 @@ const Head = () => (
     </group>
 );
 
-const Arm = ({ side, rigRef }) => (
+const Arm = ({ side, rigRef, children }) => (
     <group ref={rigRef} position={[side * 0.17, 1.22, 0]} rotation-z={side * 0.22}>
+        {children}
         <mesh position-y={-0.22}>
             <capsuleGeometry args={[0.032, 0.42, 8, 12]} />
             <Skin />
@@ -131,7 +132,8 @@ const Leg = ({ side, rigRef }) => (
     </group>
 );
 
-export const Character = ({ rig }) => {
+// `tool` is something held in the right hand (the arcade's hammer).
+export const Character = ({ rig, tool }) => {
     const set = (key) => (el) => {
         rig.current[key] = el;
     };
@@ -166,7 +168,9 @@ export const Character = ({ rig }) => {
             </mesh>
 
             <Arm side={-1} rigRef={set("leftArm")} />
-            <Arm side={1} rigRef={set("rightArm")} />
+            <Arm side={1} rigRef={set("rightArm")}>
+                {tool}
+            </Arm>
             <Leg side={-1} rigRef={set("leftLeg")} />
             <Leg side={1} rigRef={set("rightLeg")} />
         </group>

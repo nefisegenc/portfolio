@@ -148,6 +148,12 @@ const EFFECTS = {
         noiseBurst({ duration: 0.12, freq: 500, to: 180, q: 1.6, volume: 0.25 });
         tone({ freq: golden ? 1046.5 : 330, to: golden ? 1568 : 160, type: "triangle", decay: 0.18, volume: 0.12 });
     },
+    boost: () => noiseBurst({ duration: 0.5, freq: 400, to: 3000, q: 1.1, volume: 0.2 }),
+    bump: () => {
+        noiseBurst({ duration: 0.12, freq: 300, q: 1, volume: 0.25 });
+        tone({ freq: 140, to: 70, type: "triangle", decay: 0.15, volume: 0.12 });
+    },
+    whiff: () => noiseBurst({ duration: 0.14, freq: 900, to: 2400, q: 2, volume: 0.1 }),
     cheer: () =>
         [659.25, 783.99, 1046.5].forEach((freq, i) =>
             tone({ freq, start: i * 0.09, decay: 0.6, volume: 0.12, type: "triangle" })
@@ -157,6 +163,33 @@ const EFFECTS = {
 export const playSound = (name, arg) => {
     if (!ctx || ctx.state !== "running" || !useStore.getState().sound) return;
     EFFECTS[name]?.(arg);
+};
+
+// The kart's engine: a filtered sawtooth whose pitch follows the speed.
+// Pass null to fade it out.
+let engine = null;
+export const setEngine = (speed) => {
+    if (!ctx || ctx.state !== "running") return;
+    const now = ctx.currentTime;
+    if (speed === null) {
+        engine?.gain.gain.setTargetAtTime(0, now, 0.15);
+        return;
+    }
+    if (!engine) {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        const lp = ctx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = 520;
+        const gain = ctx.createGain();
+        gain.gain.value = 0;
+        osc.connect(lp).connect(gain).connect(sfxBus);
+        osc.start();
+        engine = { osc, gain };
+    }
+    const s = Math.abs(speed);
+    engine.osc.frequency.setTargetAtTime(48 + s * 7, now, 0.06);
+    engine.gain.gain.setTargetAtTime(0.035 + Math.min(s, 18) * 0.003, now, 0.08);
 };
 
 // --- Generative music -------------------------------------------------------

@@ -248,8 +248,8 @@ const BowlingTouch = () => {
 
 const KEY_HELP = {
     bowling: [["←", "→"], ["key.space"]],
-    race: [["W", "A", "S", "D"], ["Shift"], ["key.space"]],
-    bugs: [["W", "A", "S", "D"]],
+    race: [["W", "A", "S", "D"]],
+    bugs: [["W", "A", "S", "D"], ["key.space"]],
 };
 
 const KeyHelp = ({ active }) => {

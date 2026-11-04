@@ -1,18 +1,19 @@
-// Hurdle race: two laps around the arcade's running track, through the
-// glowing gates in order and over the hurdles.
+// Kart race: three laps around the arcade's track in the kart, through the
+// glowing gates in order. Boost pads on the track give a burst of speed.
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { DoubleSide } from "three";
-import { HURDLE_ANGLES, HURDLE_HEIGHT, TRACK, gateAngle, toWorld, trackPoint, worldYaw } from "../../data/arcade";
+import { BOOST_ANGLES, BOOST_LENGTH, PARKED_KART, TRACK, gateAngle, toWorld, trackPoint, worldYaw } from "../../data/arcade";
 import { playerState } from "../input";
-import { Box, Shadowed } from "../parts";
+import { Box, GlowMat, Shadowed } from "../parts";
 import { playSound } from "../sound";
 import { COUNTDOWN, tickCountdown } from "./countdown";
+import { KartModel } from "./Props";
 import { arcadeLink, useArcade } from "./state";
 
 const ORANGE = "#F97316";
 const CHECKPOINTS = TRACK.gates * TRACK.laps;
-const GATE_REACH = 1.7;
+const GATE_REACH = TRACK.halfWidth + 0.5;
 
 // The gate a checkpoint passes through: 1, 2 … 7, then 0 closes the lap.
 const gateOf = (checkpoint) => (checkpoint + 1) % TRACK.gates;
@@ -96,24 +97,19 @@ const Gate = ({ index, next, finish }) => {
     );
 };
 
-const Hurdle = ({ angle }) => (
+// A glowing strip of chevrons pointing the way round.
+const BoostPad = ({ angle }) => (
     <group {...acrossTrack(angle)}>
-        <Shadowed>
-            {[-1, 1].map((s) => (
-                <Box key={s} args={[0.08, HURDLE_HEIGHT, 0.08]} position={[s * 1.0, HURDLE_HEIGHT / 2, 0]} color="#E5E7EB" />
-            ))}
-            {[-1, 1].map((s) => (
-                <Box key={`f${s}`} args={[0.08, 0.04, 0.5]} position={[s * 1.0, 0.02, 0.1]} color="#E5E7EB" />
-            ))}
-            {Array.from({ length: 6 }, (_, i) => (
-                <Box
-                    key={i}
-                    args={[2 / 6, 0.14, 0.05]}
-                    position={[-1 + (i + 0.5) * (2 / 6), HURDLE_HEIGHT - 0.05, 0]}
-                    color={i % 2 ? "#FFFFFF" : "#EF4444"}
-                />
-            ))}
-        </Shadowed>
+        <mesh rotation-x={-Math.PI / 2} position-y={0.03}>
+            <planeGeometry args={[TRACK.halfWidth * 1.2, BOOST_LENGTH]} />
+            <meshBasicMaterial color="#1C1730" />
+        </mesh>
+        {[-0.45, 0, 0.45].map((z) => (
+            <mesh key={z} position={[0, 0.04, z]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+                <circleGeometry args={[0.36, 3]} />
+                <GlowMat color="#22D3EE" strength={3} />
+            </mesh>
+        ))}
     </group>
 );
 
@@ -182,9 +178,10 @@ export const Race = () => {
             {Array.from({ length: TRACK.gates }, (_, i) => (
                 <Gate key={i} index={i} next={next} finish={i === 0} />
             ))}
-            {HURDLE_ANGLES.map((a) => (
-                <Hurdle key={a} angle={a} />
+            {BOOST_ANGLES.map((a) => (
+                <BoostPad key={a} angle={a} />
             ))}
+            {!active && <KartModel position={[PARKED_KART.x, 0, PARKED_KART.z]} rotation-y={PARKED_KART.rot} />}
         </group>
     );
 };

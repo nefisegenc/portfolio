@@ -110,15 +110,16 @@ export const LANE = {
     length: 10.2,
 };
 
-export const TRACK = { radius: 11.5, halfWidth: 1.1, gates: 8, laps: 2 };
+export const TRACK = { radius: 11.5, halfWidth: 1.5, gates: 8, laps: 3 };
 export const trackPoint = (angle, offset = 0) => [
     Math.sin(angle) * (TRACK.radius + offset),
     Math.cos(angle) * (TRACK.radius + offset),
 ];
 // Gates sit half a step off the entrance axis so the path in stays clear.
 export const gateAngle = (i) => ((i + 0.5) / TRACK.gates) * Math.PI * 2;
-export const HURDLE_ANGLES = [1, 3, 5, 7].map((k) => (k / TRACK.gates) * Math.PI * 2);
-export const HURDLE_HEIGHT = 0.55;
+// Boost pads sit between gates, one in each quarter of the lap.
+export const BOOST_ANGLES = [1, 3, 5, 7].map((k) => (k / TRACK.gates) * Math.PI * 2);
+export const BOOST_LENGTH = 1.6;
 
 export const BUGS = {
     x: 5.6,
@@ -134,7 +135,7 @@ export const bugHoles = Array.from({ length: 9 }, (_, i) => ({
 
 export const games = [
     { id: "bowling", color: "#8B5CF6", pad: { x: LANE.x, z: LANE.foulZ + 2.3 } },
-    { id: "race", color: "#F97316", pad: { x: 2.7, z: 8.6 } },
+    { id: "race", color: "#F97316", pad: { x: 2.4, z: 7.9 } },
     { id: "bugs", color: "#22C55E", pad: { x: BUGS.x, z: BUGS.z + BUGS.fence + 1.2 } },
 ].map((g) => {
     const [x, z] = toWorld(g.pad.x, g.pad.z);
@@ -161,10 +162,13 @@ export const ARCADE_TREES = [
 export const getGame = (id) => games.find((g) => g.id === id);
 export const PAD_RADIUS = 1.3;
 
-// Solid things on the arcade, in world space. A collider with `h` only
-// blocks the player below that height, so hurdles can be jumped.
+// The race kart waits beside its pad when nobody is driving it.
+export const PARKED_KART = { x: 4.8, z: 7.2, rot: -0.6 };
+
+// Solid things on the arcade, in world space.
 const local = [
     { x: BOARD.x, z: BOARD.z, r: 1.7 },
+    ...[-1, 1].map((s) => ({ x: ENTRY.x + s * 1.95, z: ENTRY.z, r: 0.3 })),
     ...ARCADE_LAMPS.map(([x, z]) => ({ x, z, r: 0.15 })),
     ...ARCADE_TREES.map(([x, z, s]) => ({ x, z, r: 0.35 * s })),
     // Bowling: the lane's side walls and back wall, as rows of circles.
@@ -186,14 +190,13 @@ const local = [
             return { x, z, r: 0.16 };
         })
     ).flat(),
-    // Hurdles: a bar across the track.
-    ...HURDLE_ANGLES.flatMap((a) =>
-        [-0.75, 0, 0.75].map((o) => {
-            const [x, z] = trackPoint(a, o);
-            return { x, z, r: 0.38, h: HURDLE_HEIGHT };
-        })
-    ),
+    { x: PARKED_KART.x, z: PARKED_KART.z, r: 0.75 },
 ];
+
+export const boostPads = BOOST_ANGLES.map((a) => {
+    const [x, z] = toWorld(...trackPoint(a));
+    return { x, z };
+});
 
 export const arcadeColliders = [
     ...local.map((c) => {
