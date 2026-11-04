@@ -159,3 +159,10 @@ export const DownloadIcon = (p) => (
         <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />
     </Svg>
 );
+
+export const GamepadIcon = (p) => (
+    <Svg {...p}>
+        <path d="M6 11h4M8 9v4M15 12h.01M18 10h.01" />
+        <path d="M17.32 5H6.68a4 4 0 0 0-3.98 3.59L2.2 13.4a3.3 3.3 0 0 0 5.73 2.5L9.5 14h5l1.57 1.9a3.3 3.3 0 0 0 5.73-2.5l-.5-4.81A4 4 0 0 0 17.32 5Z" />
+    </Svg>
+);

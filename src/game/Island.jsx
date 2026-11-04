@@ -4,6 +4,7 @@ import { useLayoutEffect, useMemo, useRef } from "react";
 import { Float } from "@react-three/drei";
 import { Color, ConeGeometry, CylinderGeometry, Float32BufferAttribute, Object3D } from "three";
 import { ISLAND_RADIUS, PLAZA_RADIUS, paths, seeded } from "../data/world";
+import { arcadePath } from "../data/arcade";
 import { grassPatches } from "./scenery";
 import { usePalette } from "./theme";
 
@@ -26,12 +27,12 @@ const wobbleCylinder = (geometry, roughness) => {
     return geometry;
 };
 
-const TopLayer = () => {
+export const TopLayer = ({ radius = ISLAND_RADIUS, patches = grassPatches }) => {
     const p = usePalette();
-    const top = useMemo(() => wobbleCylinder(new CylinderGeometry(ISLAND_RADIUS, ISLAND_RADIUS - 1.1, 2.4, 96, 3), 0.012), []);
+    const top = useMemo(() => wobbleCylinder(new CylinderGeometry(radius, radius - 1.1, 2.4, 96, 3), 0.012), [radius]);
     const lip = useMemo(
-        () => wobbleCylinder(new CylinderGeometry(ISLAND_RADIUS + 0.25, ISLAND_RADIUS + 0.05, 0.45, 96, 1, true), 0),
-        []
+        () => wobbleCylinder(new CylinderGeometry(radius + 0.25, radius + 0.05, 0.45, 96, 1, true), 0),
+        [radius]
     );
     return (
         <group>
@@ -43,7 +44,7 @@ const TopLayer = () => {
             <mesh geometry={lip} position-y={-0.2} receiveShadow>
                 <meshStandardMaterial color={p.grassDark} flatShading roughness={1} />
             </mesh>
-            {grassPatches.map((g, i) => (
+            {patches.map((g, i) => (
                 <mesh key={i} position={[g.x, 0.008, g.z]} rotation-x={-Math.PI / 2} receiveShadow>
                     <circleGeometry args={[g.radius, 10]} />
                     <meshStandardMaterial color={p.grassDark} roughness={1} />
@@ -53,9 +54,9 @@ const TopLayer = () => {
     );
 };
 
-const Underside = () => {
+export const Underside = ({ radius = ISLAND_RADIUS }) => {
     const geometry = useMemo(() => {
-        const g = new ConeGeometry(ISLAND_RADIUS - 0.9, 20, 20, 6);
+        const g = new ConeGeometry(radius - 0.9, 20, 20, 6);
         g.rotateX(Math.PI);
         const pos = g.attributes.position;
         const colors = [];
@@ -79,9 +80,9 @@ const Underside = () => {
         g.setAttribute("color", new Float32BufferAttribute(colors, 3));
         g.computeVertexNormals();
         return g;
-    }, []);
+    }, [radius]);
     return (
-        <mesh geometry={geometry} position-y={-12.2}>
+        <mesh geometry={geometry} position-y={-2.2 - (10 * radius) / ISLAND_RADIUS} scale-y={radius / ISLAND_RADIUS}>
             <meshStandardMaterial vertexColors flatShading roughness={1} />
         </mesh>
     );
@@ -126,10 +127,13 @@ const Plaza = () => (
     </group>
 );
 
+// The arcade path goes last so the other paths keep their stones.
+const allPaths = [...paths, arcadePath];
+
 const useStones = () =>
     useMemo(() => {
         const rand = seeded(42);
-        return paths.flatMap(({ from, to }) => {
+        return allPaths.flatMap(({ from, to }) => {
             const dx = to.x - from.x;
             const dz = to.z - from.z;
             const length = Math.hypot(dx, dz);
@@ -166,7 +170,7 @@ const Paths = () => {
     }, [stones]);
     return (
         <group>
-            {paths.map(({ from, to }, i) => {
+            {allPaths.map(({ from, to }, i) => {
                 const dx = to.x - from.x;
                 const dz = to.z - from.z;
                 const length = Math.hypot(dx, dz);

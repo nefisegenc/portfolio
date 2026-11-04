@@ -7,6 +7,7 @@ import { useStore } from "../store";
 let ctx = null;
 let master = null;
 let musicBus = null;
+let trackBus = null;
 let sfxBus = null;
 let reverb = null;
 let noise = null;
@@ -64,6 +65,11 @@ const ensureContext = () => {
     musicBus.connect(master);
     musicBus.connect(reverb);
 
+    // Game soundtracks play dry, without the island's reverb.
+    trackBus = ctx.createGain();
+    trackBus.gain.value = 0;
+    trackBus.connect(master);
+
     sfxBus = ctx.createGain();
     sfxBus.gain.value = 0.55;
     sfxBus.connect(master);
@@ -73,7 +79,7 @@ const ensureContext = () => {
 };
 
 // One enveloped oscillator note.
-const tone = ({ freq, to, type = "sine", start = 0, attack = 0.01, decay = 0.4, volume = 0.2, bus = sfxBus, filter }) => {
+export const tone = ({ freq, to, type = "sine", start = 0, attack = 0.01, decay = 0.4, volume = 0.2, bus = sfxBus, filter }) => {
     const t = ctx.currentTime + start;
     const osc = ctx.createOscillator();
     osc.type = type;
@@ -95,7 +101,8 @@ const tone = ({ freq, to, type = "sine", start = 0, attack = 0.01, decay = 0.4, 
     osc.stop(t + attack + decay + 0.05);
 };
 
-const noiseBurst = ({ start = 0, duration = 0.06, freq = 1200, to, q = 1.2, volume = 0.15 }) => {
+// A burst of filtered noise; `attack` > 0 swells in instead of starting hard.
+export const noiseBurst = ({ start = 0, duration = 0.06, freq = 1200, to, q = 1.2, volume = 0.15, attack = 0, bus = sfxBus }) => {
     const t = ctx.currentTime + start;
     const src = ctx.createBufferSource();
     src.buffer = noise;
@@ -106,10 +113,15 @@ const noiseBurst = ({ start = 0, duration = 0.06, freq = 1200, to, q = 1.2, volu
     band.frequency.setValueAtTime(freq, t);
     if (to) band.frequency.exponentialRampToValueAtTime(to, t + duration);
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(volume, t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-    src.connect(band).connect(gain).connect(sfxBus);
-    src.start(t, Math.random() * 0.5, duration + 0.05);
+    if (attack > 0) {
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(volume, t + attack);
+    } else {
+        gain.gain.setValueAtTime(volume, t);
+    }
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + attack + duration);
+    src.connect(band).connect(gain).connect(bus);
+    src.start(t, Math.random() * 0.5, attack + duration + 0.05);
 };
 
 const EFFECTS = {
@@ -138,9 +150,91 @@ export const playSound = (name, arg) => {
     EFFECTS[name]?.(arg);
 };
 
+// The bus game soundtracks play into.
+export const trackOut = () => trackBus;
+
+// For effects that need their own nodes: the context and the effects bus,
+// or null while audio isn't running (or sound is off).
+export const getAudio = () => (ctx && ctx.state === "running" && useStore.getState().sound ? { ctx, out: sfxBus } : null);
+
+// The audio clock, for timing things to the music; null without audio.
+export const audioTime = () => (ctx && ctx.state === "running" ? ctx.currentTime : null);
+
+// How far behind the clock the speakers are (large on Bluetooth headphones).
+export const audioLatency = () => (ctx ? (ctx.outputLatency || ctx.baseLatency || 0) : 0);
+
+// Lets the arcade register its own effects for playSound.
+export const addEffects = (effects) => Object.assign(EFFECTS, effects);
+
+// A sustained sound (an engine, a rolling ball…) whose level and pitch the
+// game updates every frame. Noise loops move their filter; oscillators move
+// their pitch, with an optional filter cutoff. Built on first use.
+export const makeLoop = ({ source = "noise", filter = "lowpass", freq = 400, q = 1, wave = "sawtooth" }) => {
+    let nodes = null;
+    const build = () => {
+        let src;
+        if (source === "noise") {
+            src = ctx.createBufferSource();
+            src.buffer = noise;
+            src.loop = true;
+        } else {
+            src = ctx.createOscillator();
+            src.type = wave;
+            src.frequency.value = freq;
+        }
+        const f = ctx.createBiquadFilter();
+        f.type = filter;
+        f.frequency.value = freq;
+        f.Q.value = q;
+        const gain = ctx.createGain();
+        gain.gain.value = 0;
+        src.connect(f).connect(gain).connect(sfxBus);
+        src.start();
+        nodes = { src, filter: f, gain };
+    };
+    return {
+        set(level, pitch, cutoff) {
+            if (!ctx || ctx.state !== "running") return;
+            if (!nodes) {
+                if (level <= 0) return;
+                build();
+            }
+            const t = ctx.currentTime;
+            nodes.gain.gain.setTargetAtTime(level, t, 0.05);
+            if (pitch !== undefined) {
+                const param = source === "noise" ? nodes.filter.frequency : nodes.src.frequency;
+                param.setTargetAtTime(pitch, t, 0.04);
+            }
+            if (cutoff !== undefined && source !== "noise") nodes.filter.frequency.setTargetAtTime(cutoff, t, 0.04);
+        },
+    };
+};
+
 // --- Generative music -------------------------------------------------------
 
+// A game can swap in its own soundtrack: { step: seconds per step,
+// play(step, start) } scheduling one step's notes `start` seconds from now.
+let track = null;
+let trackStep = 0;
+
+export const setMusicTrack = (next) => {
+    if (track === next) return;
+    track = next;
+    trackStep = 0;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    trackBus.gain.cancelScheduledValues(t);
+    musicBus.gain.cancelScheduledValues(t);
+    trackBus.gain.setTargetAtTime(track && musicTimer ? 0.9 : 0, t, 0.3);
+    musicBus.gain.setTargetAtTime(!track && musicTimer ? 1 : 0, t, track ? 0.3 : 1.5);
+};
+
+// Schedules one step of whichever music is playing; returns its length.
 const scheduleBeat = (time) => {
+    if (track) {
+        track.play(trackStep++, time - ctx.currentTime);
+        return track.step;
+    }
     const night = useStore.getState().night;
     const chords = night ? NIGHT_CHORDS : DAY_CHORDS;
     const start = time - ctx.currentTime;
@@ -161,19 +255,19 @@ const scheduleBeat = (time) => {
         tone({ freq, start, type: "triangle", attack: 0.01, decay: 1.4, volume: 0.07, bus: musicBus, filter: 2400 });
     }
     beat++;
+    return BEAT;
 };
 
 const startMusic = () => {
     if (musicTimer || !ctx) return;
     musicBus.gain.cancelScheduledValues(ctx.currentTime);
-    musicBus.gain.setTargetAtTime(1, ctx.currentTime, 1.5);
+    musicBus.gain.setTargetAtTime(track ? 0 : 1, ctx.currentTime, 1.5);
+    trackBus.gain.cancelScheduledValues(ctx.currentTime);
+    trackBus.gain.setTargetAtTime(track ? 0.9 : 0, ctx.currentTime, 0.3);
     nextBeat = ctx.currentTime + 0.1;
     musicTimer = setInterval(() => {
-        while (nextBeat < ctx.currentTime + 0.4) {
-            scheduleBeat(nextBeat);
-            nextBeat += BEAT;
-        }
-    }, 150);
+        while (nextBeat < ctx.currentTime + 0.4) nextBeat += scheduleBeat(nextBeat);
+    }, 100);
 };
 
 const stopMusic = () => {
@@ -181,6 +275,7 @@ const stopMusic = () => {
     clearInterval(musicTimer);
     musicTimer = null;
     musicBus.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+    trackBus.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
 };
 
 // --- Wiring -----------------------------------------------------------------

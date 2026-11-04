@@ -2,16 +2,20 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { getLandmark, projectLandmarks } from "../data/world";
+import { getGame } from "../data/arcade";
+import { useArcade } from "../game/arcade/state";
 import { input } from "../game/input";
 import { isTouch } from "../game/utils";
 import { useStore } from "../store";
 import { landmarkLabel, useLang, usePersonal, useT } from "../i18n";
+import { GameHud } from "./GameHud";
 import { IslandMap } from "./IslandMap";
 import { LangToggle } from "./LangToggle";
 import {
     ArrowUpIcon,
     Avatar,
     CloseIcon,
+    GamepadIcon,
     GridIcon,
     HelpIcon,
     MapIcon,
@@ -75,7 +79,10 @@ const Progress = () => {
     );
 };
 
-const TopRight = ({ helpOpen, onHelp }) => {
+// During a game, small screens keep only the minimap so the score card fits;
+// games played away from the islands hide it, the race showing its own.
+const TopRight = ({ helpOpen, onHelp, game }) => {
+    const gameActive = Boolean(game);
     const openPanel = useStore((s) => s.openPanel);
     const night = useStore((s) => s.night);
     const toggleNight = useStore((s) => s.toggleNight);
@@ -89,13 +96,15 @@ const TopRight = ({ helpOpen, onHelp }) => {
             <button
                 onClick={() => openPanel({ type: "map" })}
                 aria-label={t("hud.openMap")}
-                className="card relative aspect-square overflow-hidden rounded-full bg-[#BFE3F5] p-1.5 transition hover:scale-[1.03]"
+                className={`card relative aspect-square overflow-hidden rounded-full bg-[#BFE3F5] p-1.5 transition hover:scale-[1.03] ${game === "race" || game === "bugs" || game === "riff" || game === "head" ? "invisible" : ""}`}
             >
                 <IslandMap />
                 <span className="keycap absolute bottom-2 right-3 hidden md:inline-grid">M</span>
             </button>
-            <Progress />
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className={gameActive ? "max-md:hidden" : undefined}>
+                <Progress />
+            </div>
+            <div className={`grid grid-cols-3 gap-1.5 ${gameActive ? "max-md:hidden" : ""}`}>
                 <button className={btn} onClick={() => openPanel({ type: "map" })} aria-label={t("hud.map")} title={`${t("hud.map")} (M)`}>
                     <MapIcon size={19} />
                 </button>
@@ -136,40 +145,93 @@ const TopRight = ({ helpOpen, onHelp }) => {
     );
 };
 
-const InteractPrompt = () => {
+// What the prompt offers: a building to enter or a game to start.
+const usePromptTarget = () => {
     const nearby = useStore((s) => s.nearby);
-    const panel = useStore((s) => s.panel);
     const openLandmark = useStore((s) => s.openLandmark);
+    const pad = useArcade((s) => (s.active ? null : s.nearby));
+    const start = useArcade((s) => s.start);
     const lang = useLang();
     const t = useT();
     const landmark = nearby && getLandmark(nearby);
+    if (landmark) {
+        return {
+            id: landmark.id,
+            color: landmark.color,
+            verb: landmark.type === "about" ? t("hud.visit") : t("hud.explore"),
+            name: landmark.shortLabel ?? landmarkLabel(landmark, lang),
+            onClick: () => openLandmark(landmark.id),
+        };
+    }
+    const game = pad && getGame(pad);
+    if (game) {
+        return { id: game.id, color: game.color, verb: t("game.play"), name: t(`game.${game.id}`), onClick: () => start(game.id) };
+    }
+    return null;
+};
+
+const InteractPrompt = () => {
+    const panel = useStore((s) => s.panel);
+    const target = usePromptTarget();
     return (
         <AnimatePresence>
-            {landmark && !panel && (
+            {target && !panel && (
                 <motion.button
-                    key={landmark.id}
-                    onClick={() => openLandmark(landmark.id)}
+                    key={target.id}
+                    onClick={target.onClick}
                     className="card pointer-events-auto fixed bottom-[176px] left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap py-2.5 pl-2.5 pr-5 md:bottom-9"
-                    style={{ borderColor: landmark.color }}
+                    style={{ borderColor: target.color }}
                     initial={{ opacity: 0, y: 24, scale: 0.9 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 16, scale: 0.95 }}
                     transition={{ type: "spring", damping: 20, stiffness: 380 }}
                 >
                     {isTouch ? (
-                        <span className="grid h-9 w-9 place-items-center rounded-full text-white" style={{ background: landmark.color }}>
+                        <span className="grid h-9 w-9 place-items-center rounded-full text-white" style={{ background: target.color }}>
                             <PlayIcon size={16} />
                         </span>
                     ) : (
                         <span className="keycap h-9 min-w-9 text-base">E</span>
                     )}
                     <span className="font-display text-lg font-bold">
-                        {landmark.type === "about" ? t("hud.visit") : t("hud.explore")}{" "}
-                        <span style={{ color: landmark.color }}>{landmark.shortLabel ?? landmarkLabel(landmark, lang)}</span>
+                        {target.verb} <span style={{ color: target.color }}>{target.name}</span>
                     </span>
                 </motion.button>
             )}
         </AnimatePresence>
+    );
+};
+
+// Portfolio or game mode: a switch that's always in reach. Game mode means
+// the arcade island (or a game under way); switching to it opens the menu.
+const ModeSwitch = () => {
+    const gameMode = useArcade((s) => s.area === "arcade" || Boolean(s.active));
+    const enter = useArcade((s) => s.enterGameMode);
+    const leave = useArcade((s) => s.leaveGameMode);
+    const t = useT();
+    const base = "flex items-center gap-1.5 rounded-[14px] px-3 py-2 font-display text-sm font-bold transition md:px-3.5";
+    return (
+        <div role="radiogroup" aria-label={t("mode.label")} className="card pointer-events-auto flex gap-1 p-1">
+            <button
+                role="radio"
+                aria-checked={!gameMode}
+                onClick={gameMode ? leave : undefined}
+                className={`${base} ${gameMode ? "text-ink-soft hover:bg-ink/5" : "bg-ink text-white"}`}
+            >
+                {t("mode.portfolio")}
+            </button>
+            <button
+                role="radio"
+                aria-checked={gameMode}
+                onClick={enter}
+                className={`${base} ${gameMode ? "text-white shadow-[0_3px_0_#9D174D]" : "text-[#DB2777] hover:bg-[#EC4899]/10"}`}
+                style={gameMode ? { background: "linear-gradient(120deg, #EC4899, #8B5CF6)" } : undefined}
+            >
+                <GamepadIcon size={18} />
+                {t("mode.games")}
+                {!gameMode && <span className="keycap ml-0.5 hidden md:inline-grid">G</span>}
+            </button>
+        </div>
     );
 };
 
@@ -181,6 +243,7 @@ const KEYS = [
     [["E"], "controls.enter"],
     [["M"], "controls.map"],
     [["N"], "controls.night"],
+    [["G"], "controls.games"],
 ];
 
 // Bottom-left on desktop; on narrow windows it drops down under the buttons.
@@ -276,24 +339,29 @@ const Joystick = () => {
     );
 };
 
-const MobileControls = () => {
+// In a game the jump button gives way to the game's own action button.
+const MobileControls = ({ game }) => {
     const t = useT();
     return (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 flex items-end justify-between px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <Joystick />
-            <button
-                aria-label={t("hud.jump")}
-                className="pointer-events-auto mb-4 grid h-16 w-16 touch-none place-items-center rounded-full border-[3px] border-white bg-paper text-ink shadow-[0_4px_0_rgb(42_35_64/0.25)] active:translate-y-1"
-                onPointerDown={() => (input.jump = true)}
-            >
-                <ArrowUpIcon size={26} />
-            </button>
+            {!game && (
+                <button
+                    aria-label={t("hud.jump")}
+                    className="pointer-events-auto mb-4 grid h-16 w-16 touch-none place-items-center rounded-full border-[3px] border-white bg-paper text-ink shadow-[0_4px_0_rgb(42_35_64/0.25)] active:translate-y-1"
+                    onPointerDown={() => (input.jump = true)}
+                >
+                    <ArrowUpIcon size={26} />
+                </button>
+            )}
         </div>
     );
 };
 
 export const Hud = () => {
     const panel = useStore((s) => s.panel);
+    const game = useArcade((s) => s.active);
+    const bowling = game === "bowling";
     const hasMoved = useStore((s) => s.hasMoved);
     // Shown once on wide screens, then tucked away a few seconds after the
     // first steps, unless the visitor opened or closed it themselves.
@@ -315,14 +383,20 @@ export const Hud = () => {
     return (
         <motion.div className="pointer-events-none fixed inset-0 z-10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
             <div className="flex items-start justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:p-6">
-                <div className="pointer-events-auto">
-                    <PlayerBadge />
+                <div className="flex flex-col items-start gap-2 md:flex-row md:items-center md:gap-3">
+                    {/* Phones held sideways need the top edge for a game's score card. */}
+                    <div className={`pointer-events-auto ${game ? "[@media(max-height:520px)]:hidden" : ""}`}>
+                        <PlayerBadge />
+                    </div>
+                    {!game && <ModeSwitch />}
                 </div>
-                <TopRight helpOpen={helpOpen} onHelp={() => toggleHelp(!helpOpen)} />
+                {/* Head to Head's ball flies up into that corner of the screen. */}
+                {game !== "head" && <TopRight helpOpen={helpOpen} onHelp={() => toggleHelp(!helpOpen)} game={game} />}
             </div>
             <InteractPrompt />
-            {!isTouch && <ControlsHint open={!panel && helpOpen} onClose={() => toggleHelp(false)} />}
-            {isTouch && !panel && <MobileControls />}
+            {!isTouch && <ControlsHint open={!panel && !game && helpOpen} onClose={() => toggleHelp(false)} />}
+            {isTouch && !panel && !bowling && game !== "head" && <MobileControls game={game} />}
+            <GameHud />
         </motion.div>
     );
 };

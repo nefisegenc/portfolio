@@ -1,10 +1,11 @@
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { PerformanceMonitor, useProgress } from "@react-three/drei";
 import { Bloom, EffectComposer, ToneMapping, Vignette } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
-import { NeutralToneMapping, PCFSoftShadowMap } from "three";
+import { NeutralToneMapping, Object3D, PCFSoftShadowMap } from "three";
 import { useStore } from "../store";
+import { Arcade } from "./arcade/Arcade";
 import { Centerpiece } from "./Centerpiece";
 import { Island } from "./Island";
 import { Landmarks } from "./Landmarks";
@@ -13,23 +14,45 @@ import { Player } from "./Player";
 import { Sky } from "./Sky";
 import { usePalette } from "./theme";
 import { isTouch } from "./utils";
+import { ARCADE } from "../data/arcade";
+import { arcadeLink, useArcade } from "./arcade/state";
 
 // Highest device pixel ratio used at each quality level. Even "full" stays at
 // 1.5: on Retina screens 2x costs ~80% more pixels for a barely visible gain.
 const QUALITY_DPR = [1, 1.25, 1.5];
 
+const SUN_OFFSET = [22, 34, 16];
+const FOCUS_STEP = 6;
+
 const Lights = () => {
     const p = usePalette();
     const night = useStore((s) => s.night);
     const size = isTouch ? 1024 : 1536;
+    const sun = useRef();
+    const target = useMemo(() => new Object3D(), []);
+    // The shadow area covers whichever island the player is on, or follows
+    // the player around a game that roams further (the race), in steps.
+    useFrame(() => {
+        const focus = arcadeLink.focus;
+        const onArcade = useArcade.getState().area === "arcade";
+        const x = focus ? Math.round(focus.x / FOCUS_STEP) * FOCUS_STEP : onArcade ? ARCADE.x : 0;
+        const z = focus ? Math.round(focus.z / FOCUS_STEP) * FOCUS_STEP : onArcade ? ARCADE.z : 0;
+        if (target.position.x === x && target.position.z === z) return;
+        target.position.set(x, 0, z);
+        target.updateMatrixWorld();
+        sun.current.position.set(x + SUN_OFFSET[0], SUN_OFFSET[1], z + SUN_OFFSET[2]);
+    });
     return (
         <>
             <color attach="background" args={[p.skyHorizon]} />
             <fog attach="fog" args={[p.fog, 70, 190]} />
             <hemisphereLight color={p.hemiSky} groundColor={p.hemiGround} intensity={p.hemi} />
+            <primitive object={target} />
             <directionalLight
+                ref={sun}
+                target={target}
                 castShadow
-                position={[22, 34, 16]}
+                position={SUN_OFFSET}
                 color={p.sun}
                 intensity={p.sunIntensity}
                 shadow-mapSize={[size, size]}
@@ -131,6 +154,7 @@ export const Scene = ({ paused }) => {
                 <Nature />
                 <Centerpiece />
                 <Landmarks />
+                <Arcade />
                 <Player />
                 <SceneReady />
             </Suspense>

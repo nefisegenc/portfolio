@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useStore } from "../store";
+import { useArcade } from "../game/arcade/state";
 import { AboutPanel } from "./AboutPanel";
+import { ArcadeMenu } from "./ArcadeMenu";
 import { Hud } from "./Hud";
 import { MapOverlay } from "./IslandMap";
 import { ProjectPanel } from "./ProjectPanel";
@@ -14,8 +16,10 @@ const useGlobalKeys = () => {
         const onKey = (e) => {
             if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
             const s = useStore.getState();
+            const arcade = useArcade.getState();
             if (e.key === "Escape") {
                 if (s.panel) s.closePanel();
+                else if (arcade.active) arcade.quit();
                 return;
             }
             if (s.phase === "title") {
@@ -28,10 +32,20 @@ const useGlobalKeys = () => {
                 else if (!s.panel) s.openPanel({ type: "map" });
                 return;
             }
+            // G: game mode (menu on, or off again).
+            if (e.code === "KeyG" && !arcade.active) {
+                if (s.panel?.type === "arcade") s.closePanel();
+                else if (!s.panel) arcade.enterGameMode();
+                return;
+            }
             if (s.panel) return;
+            if (arcade.active) return;
             if ((e.code === "KeyE" || e.key === "Enter") && s.nearby) {
                 e.preventDefault();
                 s.openLandmark(s.nearby);
+            } else if ((e.code === "KeyE" || e.key === "Enter") && arcade.nearby) {
+                e.preventDefault();
+                arcade.start(arcade.nearby);
             }
             if (e.code === "KeyN") s.toggleNight();
             if (e.code === "KeyP") s.openPanel({ type: "about" });
@@ -55,6 +69,7 @@ export const Overlay = () => {
                 {panel?.type === "project" && <ProjectPanel key={`project-${panel.id}`} id={panel.id} />}
                 {panel?.type === "about" && <AboutPanel key="about" />}
                 {panel?.type === "map" && <MapOverlay key="map" />}
+                {panel?.type === "arcade" && <ArcadeMenu key="arcade" />}
             </AnimatePresence>
             <Toasts />
             <Flash />
