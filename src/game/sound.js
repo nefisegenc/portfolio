@@ -131,6 +131,27 @@ const EFFECTS = {
         [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((freq, i) =>
             tone({ freq, start: i * 0.12, decay: 1.1, volume: 0.14, type: "triangle" })
         ),
+    // Arcade games
+    beep: () => tone({ freq: 660, type: "square", decay: 0.12, volume: 0.06, filter: 2000 }),
+    go: () => tone({ freq: 990, type: "square", decay: 0.35, volume: 0.07, filter: 2600 }),
+    gate: () => {
+        tone({ freq: 880, type: "triangle", decay: 0.18, volume: 0.1 });
+        tone({ freq: 1318.5, type: "triangle", start: 0.07, decay: 0.25, volume: 0.09 });
+    },
+    roll: () => noiseBurst({ duration: 1.1, freq: 160, to: 260, q: 0.7, volume: 0.22 }),
+    pins: () => {
+        noiseBurst({ duration: 0.35, freq: 2400, to: 900, q: 0.9, volume: 0.25 });
+        noiseBurst({ start: 0.06, duration: 0.3, freq: 1500, q: 1.4, volume: 0.18 });
+        tone({ freq: 1800, to: 1200, type: "triangle", decay: 0.15, volume: 0.05 });
+    },
+    smash: (golden) => {
+        noiseBurst({ duration: 0.12, freq: 500, to: 180, q: 1.6, volume: 0.25 });
+        tone({ freq: golden ? 1046.5 : 330, to: golden ? 1568 : 160, type: "triangle", decay: 0.18, volume: 0.12 });
+    },
+    cheer: () =>
+        [659.25, 783.99, 1046.5].forEach((freq, i) =>
+            tone({ freq, start: i * 0.09, decay: 0.6, volume: 0.12, type: "triangle" })
+        ),
 };
 
 export const playSound = (name, arg) => {

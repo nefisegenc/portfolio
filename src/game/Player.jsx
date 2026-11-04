@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { MathUtils, Vector3 } from "three";
 import { useStore } from "../store";
-import { INTERACT_RADIUS, SPAWN, WALK_RADIUS, getLandmark, landmarks } from "../data/world";
+import { INTERACT_RADIUS, SPAWN, getLandmark, landmarks } from "../data/world";
+import { ENTRY, PAD_RADIUS, clampToWalkable, games, getGame, isOnArcadeSide, toWorld, worldYaw } from "../data/arcade";
+import { arcadeLink, useArcade } from "./arcade/state";
 import { Character } from "./Character";
 import { colliders } from "./scenery";
 import { bindKeyboard, bindPointerLook, cameraState, input, playerState } from "./input";
@@ -28,8 +30,9 @@ const angleLerp = (from, to, t) => {
 
 const damp = (lambda, dt) => 1 - Math.exp(-lambda * dt);
 
-const resolveCollisions = (pos) => {
+const resolveCollisions = (pos, y) => {
     for (const c of colliders) {
+        if (c.h !== undefined && y > c.h) continue;
         const dx = pos.x - c.x;
         const dz = pos.z - c.z;
         const min = c.r + PLAYER_RADIUS;
@@ -40,11 +43,25 @@ const resolveCollisions = (pos) => {
             pos.z = c.z + (dz / d) * min;
         }
     }
-    const r = Math.hypot(pos.x, pos.z);
-    if (r > WALK_RADIUS) {
-        pos.x *= WALK_RADIUS / r;
-        pos.z *= WALK_RADIUS / r;
+    clampToWalkable(pos);
+};
+
+// Where fast travel drops the player: in front of a landmark, on a game's
+// pad, back at the plaza, or under the arcade's arch. `open` is the landmark to show on arrival.
+const travelSpot = (id) => {
+    const l = getLandmark(id);
+    if (l) {
+        return {
+            x: l.entrance.x + l.toCenter.x * 0.6,
+            z: l.entrance.z + l.toCenter.z * 0.6,
+            rotY: Math.atan2(-l.toCenter.x, -l.toCenter.z),
+            open: l.id,
+        };
     }
+    if (id === "plaza") return { x: SPAWN.x, z: SPAWN.z, rotY: SPAWN.yaw + Math.PI };
+    const g = getGame(id);
+    const [x, z] = g ? [g.x, g.z] : toWorld(ENTRY.x, ENTRY.z - 4);
+    return { x, z, rotY: worldYaw(0, -1) };
 };
 
 // Pull the camera in when a building sits between it and the player.
@@ -90,21 +107,34 @@ export const Player = () => {
         const s = state.current;
         const pos = group.current.position;
         const store = useStore.getState();
+        const arcade = useArcade.getState();
         const playing = store.phase === "playing";
-        const canMove = playing && !store.panel;
+        const canMove = playing && !store.panel && !arcadeLink.lock;
 
-        // Fast travel from the map.
+        // Fast travel from the map, or a game moving the player to its start.
+        let jump = null;
         if (store.travelTarget) {
-            const l = getLandmark(store.travelTarget);
-            pos.set(l.entrance.x + l.toCenter.x * 0.6, 0, l.entrance.z + l.toCenter.z * 0.6);
+            if (arcade.active) arcade.quit();
+            jump = travelSpot(store.travelTarget);
+            store.clearTravel();
+            if (jump.open) setTimeout(() => useStore.getState().openLandmark(jump.open), 500);
+        } else if (arcadeLink.teleport) {
+            jump = arcadeLink.teleport;
+            arcadeLink.teleport = null;
+        }
+        if (jump) {
+            pos.set(jump.x, 0, jump.z);
             s.vx = s.vz = s.vy = s.y = 0;
-            s.rotY = Math.atan2(-l.toCenter.x, -l.toCenter.z);
-            cameraState.yaw = Math.atan2(l.toCenter.x, l.toCenter.z);
+            s.rotY = jump.rotY;
+            cameraState.yaw = jump.rotY + Math.PI;
             cameraState.pitch = 0.32;
             s.snapCamera = true;
-            const id = l.id;
-            store.clearTravel();
-            setTimeout(() => useStore.getState().openLandmark(id), 500);
+        }
+        // A game can hold the player in place (aiming in bowling, countdowns).
+        if (arcadeLink.lock) {
+            pos.set(arcadeLink.lock.x, 0, arcadeLink.lock.z);
+            s.rotY = arcadeLink.lock.rotY;
+            s.vx = s.vz = 0;
         }
 
         // Movement input, relative to where the camera looks.
@@ -130,7 +160,7 @@ export const Player = () => {
         for (let i = 0; i < steps; i++) {
             pos.x += (s.vx * dt) / steps;
             pos.z += (s.vz * dt) / steps;
-            resolveCollisions(pos);
+            if (!arcadeLink.lock) resolveCollisions(pos, s.y);
         }
         const moving = Math.hypot(s.vx, s.vz);
         if (moving > 0.5 && canMove) store.markMoved();
@@ -184,6 +214,16 @@ export const Player = () => {
             if (nearby) store.discover(nearby);
         }
 
+        // Game pads on the arcade.
+        let pad = null;
+        if (playing && !arcade.active) {
+            for (const g of games) {
+                if (Math.hypot(pos.x - g.x, pos.z - g.z) < PAD_RADIUS) pad = g.id;
+            }
+        }
+        arcade.setNearby(pad);
+        arcade.setArea(isOnArcadeSide(pos.x, pos.z) ? "arcade" : "main");
+
         playerState.x = pos.x;
         playerState.z = pos.z;
         playerState.rotY = s.rotY;
@@ -204,6 +244,14 @@ export const Player = () => {
             tmp.goal.set(Math.sin(a) * 48, 25, Math.cos(a) * 48);
             camera.position.lerp(tmp.goal, damp(2, dt));
             tmp.look.lerp(tmp.goal.set(0, 0, 0), damp(2, dt));
+            camera.lookAt(tmp.look);
+            return;
+        }
+
+        // Games with their own camera (bowling) take over here.
+        if (arcadeLink.camera) {
+            camera.position.lerp(arcadeLink.camera.position, damp(4, dt));
+            tmp.look.lerp(arcadeLink.camera.target, damp(5, dt));
             camera.lookAt(tmp.look);
             return;
         }

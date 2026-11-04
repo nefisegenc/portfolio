@@ -2,10 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { getLandmark, projectLandmarks } from "../data/world";
+import { getGame } from "../data/arcade";
+import { useArcade } from "../game/arcade/state";
 import { input } from "../game/input";
 import { isTouch } from "../game/utils";
 import { useStore } from "../store";
 import { landmarkLabel, useLang, usePersonal, useT } from "../i18n";
+import { GameHud } from "./GameHud";
 import { IslandMap } from "./IslandMap";
 import { LangToggle } from "./LangToggle";
 import {
@@ -75,7 +78,8 @@ const Progress = () => {
     );
 };
 
-const TopRight = ({ helpOpen, onHelp }) => {
+// During a game, small screens keep only the minimap so the score card fits.
+const TopRight = ({ helpOpen, onHelp, gameActive }) => {
     const openPanel = useStore((s) => s.openPanel);
     const night = useStore((s) => s.night);
     const toggleNight = useStore((s) => s.toggleNight);
@@ -94,8 +98,10 @@ const TopRight = ({ helpOpen, onHelp }) => {
                 <IslandMap />
                 <span className="keycap absolute bottom-2 right-3 hidden md:inline-grid">M</span>
             </button>
-            <Progress />
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className={gameActive ? "max-md:hidden" : undefined}>
+                <Progress />
+            </div>
+            <div className={`grid grid-cols-3 gap-1.5 ${gameActive ? "max-md:hidden" : ""}`}>
                 <button className={btn} onClick={() => openPanel({ type: "map" })} aria-label={t("hud.map")} title={`${t("hud.map")} (M)`}>
                     <MapIcon size={19} />
                 </button>
@@ -136,36 +142,56 @@ const TopRight = ({ helpOpen, onHelp }) => {
     );
 };
 
-const InteractPrompt = () => {
+// What the prompt offers: a building to enter or a game to start.
+const usePromptTarget = () => {
     const nearby = useStore((s) => s.nearby);
-    const panel = useStore((s) => s.panel);
     const openLandmark = useStore((s) => s.openLandmark);
+    const pad = useArcade((s) => (s.active ? null : s.nearby));
+    const start = useArcade((s) => s.start);
     const lang = useLang();
     const t = useT();
     const landmark = nearby && getLandmark(nearby);
+    if (landmark) {
+        return {
+            id: landmark.id,
+            color: landmark.color,
+            verb: landmark.type === "about" ? t("hud.visit") : t("hud.explore"),
+            name: landmark.shortLabel ?? landmarkLabel(landmark, lang),
+            onClick: () => openLandmark(landmark.id),
+        };
+    }
+    const game = pad && getGame(pad);
+    if (game) {
+        return { id: game.id, color: game.color, verb: t("game.play"), name: t(`game.${game.id}`), onClick: () => start(game.id) };
+    }
+    return null;
+};
+
+const InteractPrompt = () => {
+    const panel = useStore((s) => s.panel);
+    const target = usePromptTarget();
     return (
         <AnimatePresence>
-            {landmark && !panel && (
+            {target && !panel && (
                 <motion.button
-                    key={landmark.id}
-                    onClick={() => openLandmark(landmark.id)}
+                    key={target.id}
+                    onClick={target.onClick}
                     className="card pointer-events-auto fixed bottom-[176px] left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap py-2.5 pl-2.5 pr-5 md:bottom-9"
-                    style={{ borderColor: landmark.color }}
+                    style={{ borderColor: target.color }}
                     initial={{ opacity: 0, y: 24, scale: 0.9 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 16, scale: 0.95 }}
                     transition={{ type: "spring", damping: 20, stiffness: 380 }}
                 >
                     {isTouch ? (
-                        <span className="grid h-9 w-9 place-items-center rounded-full text-white" style={{ background: landmark.color }}>
+                        <span className="grid h-9 w-9 place-items-center rounded-full text-white" style={{ background: target.color }}>
                             <PlayIcon size={16} />
                         </span>
                     ) : (
                         <span className="keycap h-9 min-w-9 text-base">E</span>
                     )}
                     <span className="font-display text-lg font-bold">
-                        {landmark.type === "about" ? t("hud.visit") : t("hud.explore")}{" "}
-                        <span style={{ color: landmark.color }}>{landmark.shortLabel ?? landmarkLabel(landmark, lang)}</span>
+                        {target.verb} <span style={{ color: target.color }}>{target.name}</span>
                     </span>
                 </motion.button>
             )}
@@ -294,6 +320,8 @@ const MobileControls = () => {
 
 export const Hud = () => {
     const panel = useStore((s) => s.panel);
+    const game = useArcade((s) => s.active);
+    const bowling = game === "bowling";
     const hasMoved = useStore((s) => s.hasMoved);
     // Shown once on wide screens, then tucked away a few seconds after the
     // first steps, unless the visitor opened or closed it themselves.
@@ -318,11 +346,12 @@ export const Hud = () => {
                 <div className="pointer-events-auto">
                     <PlayerBadge />
                 </div>
-                <TopRight helpOpen={helpOpen} onHelp={() => toggleHelp(!helpOpen)} />
+                <TopRight helpOpen={helpOpen} onHelp={() => toggleHelp(!helpOpen)} gameActive={Boolean(game)} />
             </div>
             <InteractPrompt />
-            {!isTouch && <ControlsHint open={!panel && helpOpen} onClose={() => toggleHelp(false)} />}
-            {isTouch && !panel && <MobileControls />}
+            {!isTouch && <ControlsHint open={!panel && !game && helpOpen} onClose={() => toggleHelp(false)} />}
+            {isTouch && !panel && !bowling && <MobileControls />}
+            <GameHud />
         </motion.div>
     );
 };
