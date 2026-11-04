@@ -26,6 +26,15 @@ const MIN_SPEED = 5;
 const MAX_SPEED = 12;
 const HOOK = 2.6;
 const AIM_RANGE = LANE.halfWidth - 0.2;
+const AIM_SWING = 0.12;
+
+// The arrow sweeps side to side at a steady pace (no slowing down through
+// the middle), with each frame's sweep quicker than the last.
+const aimAngle = (t, frame) => {
+    const period = 0.62 - frame * 0.06;
+    const x = (t / period + 0.25) % 1;
+    return AIM_SWING * (x < 0.5 ? 4 * x - 1 : 3 - 4 * x);
+};
 const SIDE_WALL = LANE.halfWidth + LANE.gutter;
 const POWER_PERIOD = 1.1;
 const PURPLE = "#8B5CF6";
@@ -516,8 +525,7 @@ export const Bowling = () => {
                 if (g.phase === "aim") {
                     g.aimU = Math.max(-AIM_RANGE, Math.min(AIM_RANGE, g.aimU + dir * 1.4 * dt));
                     g.aimT += dt;
-                    // The arrow swings quickly, and a little quicker every frame.
-                    g.angle = Math.sin(g.aimT * (3.6 + g.frame * 0.5)) * 0.12;
+                    g.angle = aimAngle(g.aimT, g.frame);
                     if (arcadeLink.action) {
                         arcadeLink.action = false;
                         g.phase = "power";
