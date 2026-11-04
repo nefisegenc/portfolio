@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { getGame } from "../data/arcade";
 import { BOWLING_FRAMES, frameTotals, rollMarks } from "../game/arcade/bowlingScore";
 import { formatScore } from "../game/arcade/format";
+import { FRET_KEYS, LANE_COLORS } from "../game/arcade/riff/song";
 import { arcadeLink, useArcade } from "../game/arcade/state";
 import { input } from "../game/input";
 import { isTouch } from "../game/utils";
@@ -511,14 +512,12 @@ const RiffJudge = () => {
     );
 };
 
-const FRET_COLORS = ["#22C55E", "#EF4444", "#FACC15", "#3B82F6", "#F97316"];
-
 // Five fret buttons along the bottom on touch screens.
 const RiffTouch = () => {
     useEffect(() => () => [0, 1, 2, 3, 4].forEach((lane) => arcadeLink.fret?.(lane, false)), []);
     return (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 flex justify-center gap-2 px-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            {FRET_COLORS.map((c, lane) => {
+            {LANE_COLORS.map((c, lane) => {
                 const up = () => arcadeLink.fret?.(lane, false);
                 return (
                     <button
@@ -544,8 +543,10 @@ const KEY_HELP = {
     hook: [["←", "→"]],
     race: [["W", "A", "S", "D"], ["key.space"]],
     bugs: [["W", "A", "S", "D"], ["key.mouse"]],
-    riff: [["D", "F", "J", "K", "L"]],
+    riff: [FRET_KEYS],
 };
+// Riff Rush's keys wear their frets' colours.
+const KEY_TINTS = { riff: LANE_COLORS };
 
 const KeyHelp = ({ active }) => {
     const t = useT();
@@ -556,8 +557,12 @@ const KeyHelp = ({ active }) => {
         <div className="card pointer-events-none fixed bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap px-4 py-2 text-sm font-bold text-ink-soft">
             {KEY_HELP[help].map((keys) => (
                 <span key={keys.join()} className="flex gap-1">
-                    {keys.map((k) => (
-                        <span key={k} className="keycap">
+                    {keys.map((k, i) => (
+                        <span
+                            key={k}
+                            className="keycap"
+                            style={KEY_TINTS[help] && { background: KEY_TINTS[help][i], borderColor: KEY_TINTS[help][i], color: "#fff" }}
+                        >
                             {k.startsWith("key.") ? t(k) : k}
                         </span>
                     ))}
@@ -596,6 +601,9 @@ export const GameHud = () => {
     const active = useArcade((s) => s.active);
     const status = useArcade((s) => s.status);
     const result = useArcade((s) => s.result);
+    // Riff Rush's frets carry their keys, so its help bar steps aside once
+    // the song is under way and the highway needs the room.
+    const riffUnderway = useArcade((s) => s.active === "riff" && (s.detail?.progress ?? 0) > 0.1);
     const t = useT();
     useGameKeys();
     return (
@@ -612,7 +620,7 @@ export const GameHud = () => {
             {active === "bugs" && <HurtFlash />}
             {active === "riff" && <RiffJudge />}
             {active === "riff" && status === "playing" && isTouch && <RiffTouch />}
-            {active && status !== "done" && !isTouch && <KeyHelp active={active} />}
+            {active && status !== "done" && !isTouch && !riffUnderway && <KeyHelp active={active} />}
         </>
     );
 };

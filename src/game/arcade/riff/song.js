@@ -7,6 +7,8 @@ export const STEP = 60 / BPM / 4;
 export const BAR = STEP * 16;
 export const LANES = 5;
 export const LANE_COLORS = ["#22C55E", "#EF4444", "#FACC15", "#3B82F6", "#F97316"];
+// One key per fret, side by side on the keyboard (1–5 work too).
+export const FRET_KEYS = ["A", "S", "D", "F", "G"];
 export const LANE_FREQS = [329.63, 392, 440, 493.88, 587.33];
 
 // Backing: Em – C – G – D, one chord a bar.

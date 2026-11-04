@@ -15,7 +15,7 @@ import { audioLatency, audioTime, playSound, setMusicTrack } from "../../sound";
 import { guitar, riffMusic, silence } from "../audio";
 import { COUNTDOWN, tickCountdown } from "../countdown";
 import { arcadeLink, useArcade } from "../state";
-import { BAR, BPM, CHART, LANES, LANE_COLORS, LANE_FREQS, SONG_LENGTH, sectionAt } from "./song";
+import { BAR, BPM, CHART, FRET_KEYS, LANES, LANE_COLORS, LANE_FREQS, SONG_LENGTH, sectionAt } from "./song";
 import { DECK, PLAYER_SPOT, STAGE, STAGE_YAW, stageToWorld } from "./stage";
 
 const RADIUS = 15;
@@ -33,7 +33,7 @@ const OVERSTRUM = -0.015;
 // find the beat.
 const GRACE = 12;
 const BEAT = 60 / BPM;
-const KEYS = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3, KeyL: 4, Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4 };
+const KEYS = Object.fromEntries(FRET_KEYS.flatMap((k, lane) => [[`Key${k}`, lane], [`Digit${lane + 1}`, lane]]));
 const laneX = (lane) => (lane - (LANES - 1) / 2) * HIGHWAY.lane;
 const MAX_TAILS = 24;
 const MAX_SPARKS = 160;
@@ -389,6 +389,20 @@ const Highway = ({ set }) => {
                         <circleGeometry args={[0.28, 32]} />
                         <meshBasicMaterial color={c} transparent opacity={0.15} toneMapped={false} />
                     </mesh>
+                    {/* The fret's key, so it's clear what to press. */}
+                    <Text
+                        font={FONT}
+                        fontSize={0.34}
+                        rotation-x={-Math.PI / 2}
+                        position-y={0.015}
+                        anchorX="center"
+                        anchorY="middle"
+                        color="#FFFFFF"
+                        outlineWidth={0.03}
+                        outlineColor="#0B0A14"
+                    >
+                        {FRET_KEYS[lane]}
+                    </Text>
                 </group>
             ))}
         </group>
