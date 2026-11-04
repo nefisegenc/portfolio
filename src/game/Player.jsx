@@ -9,6 +9,7 @@ import { INTERACT_RADIUS, SPAWN, getLandmark, landmarks } from "../data/world";
 import {
     ENTRY,
     PAD_RADIUS,
+    arcadeColliders,
     clampToWalkable,
     games,
     getGame,
@@ -18,6 +19,7 @@ import {
 } from "../data/arcade";
 import { KartModel } from "./arcade/Props";
 import { Blaster } from "./arcade/hunt/BugHunt";
+import { Guitar } from "./arcade/riff/Riff";
 import { arcadeLink, useArcade } from "./arcade/state";
 import { Character } from "./Character";
 import { colliders } from "./scenery";
@@ -34,8 +36,9 @@ const HUNT_SPEED_BOOST = 1.35;
 
 
 
-// Buildings the camera must not sink into (trees are small enough to ignore).
-const cameraBlockers = landmarks.flatMap((l) => l.colliders.filter((c) => c.r > 1.5));
+// Buildings the camera must not sink into (trees are small enough to ignore),
+// and the arcade's high-score board.
+const cameraBlockers = [...landmarks.flatMap((l) => l.colliders), ...arcadeColliders].filter((c) => c.r > 1.5);
 
 const angleLerp = (from, to, t) => {
     let diff = to - from;
@@ -193,11 +196,21 @@ export const Player = () => {
             const speed = (input.run ? RUN_SPEED : WALK_SPEED) * (hunting ? HUNT_SPEED_BOOST : 1);
             s.vx = MathUtils.lerp(s.vx, mx * speed, damp(12, dt));
             s.vz = MathUtils.lerp(s.vz, mz * speed, damp(12, dt));
+            // A game can shove the player (a bug's bite); it fades on its own.
+            if (arcadeLink.push) {
+                s.pushX = arcadeLink.push.x;
+                s.pushZ = arcadeLink.push.z;
+                arcadeLink.push = null;
+            }
+            const pushX = s.pushX ?? 0;
+            const pushZ = s.pushZ ?? 0;
+            s.pushX = pushX * (1 - damp(6, dt));
+            s.pushZ = pushZ * (1 - damp(6, dt));
             // Sub-step so a long frame can't tunnel through thin colliders.
-            const steps = Math.max(1, Math.ceil((Math.hypot(s.vx, s.vz) * dt) / 0.25));
+            const steps = Math.max(1, Math.ceil((Math.hypot(s.vx + pushX, s.vz + pushZ) * dt) / 0.25));
             for (let i = 0; i < steps; i++) {
-                pos.x += (s.vx * dt) / steps;
-                pos.z += (s.vz * dt) / steps;
+                pos.x += ((s.vx + pushX) * dt) / steps;
+                pos.z += ((s.vz + pushZ) * dt) / steps;
                 if (!arcadeLink.lock) resolveCollisions(pos);
             }
             moving = Math.hypot(s.vx, s.vz);
@@ -221,6 +234,9 @@ export const Player = () => {
         if (arcadeLink.aimYaw !== null && arcadeLink.aimYaw !== undefined) s.rotY = angleLerp(s.rotY, arcadeLink.aimYaw, damp(20, dt));
         else if (!driving && moving > 0.3) s.rotY = angleLerp(s.rotY, Math.atan2(s.vx, s.vz), damp(12, dt));
         group.current.rotation.y = s.rotY;
+        // Blink for a moment after being hurt.
+        arcadeLink.blink = Math.max(0, arcadeLink.blink - dt);
+        group.current.visible = !(arcadeLink.blink > 0 && Math.floor(clock.elapsedTime * 18) % 2 === 0);
 
         // Walk cycle
         const r = rig.current;
@@ -260,6 +276,20 @@ export const Player = () => {
                 // Blaster held out in front.
                 r.rightArm.rotation.x = -1.45;
                 r.leftArm.rotation.x = MathUtils.lerp(r.leftArm.rotation.x, -1.1, damp(12, dt));
+            }
+            // On stage: one hand on the neck, the other strumming each note,
+            // nodding along to the beat.
+            const playing = arcade.active === "riff";
+            if (playing) {
+                const since = (performance.now() - arcadeLink.strum) / 1000;
+                const strum = since < 0.18 ? Math.sin((since / 0.18) * Math.PI) * 0.45 : 0;
+                r.leftArm.rotation.x = -0.6 - strum;
+                r.rightArm.rotation.x = -1.2;
+                r.rightArm.rotation.z = 0.75;
+                r.body.position.y = Math.abs(Math.sin(arcadeLink.beat * Math.PI)) * 0.05;
+                r.body.rotation.x = Math.sin(arcadeLink.beat * Math.PI * 2) * 0.05;
+            } else if (r.rightArm.rotation.z !== 0.22) {
+                r.rightArm.rotation.z = 0.22;
             }
         }
 
@@ -355,7 +385,13 @@ export const Player = () => {
             <Controls />
             <group ref={group}>
                 <group ref={tilt} rotation-order="YXZ">
-                    <Character rig={rig} tool={game === "bugs" ? <Blaster /> : null} />
+                    <Character rig={rig} tool={game === "bugs" ? <Blaster /> : null}>
+                        {game === "riff" && (
+                            <group position={[-0.05, 0.95, 0.2]} rotation={[0.1, 0.15, 0.45]}>
+                                <Guitar />
+                            </group>
+                        )}
+                    </Character>
                     {game === "race" && <KartModel wheels={wheels} position-z={0.12} />}
                 </group>
                 <mesh position-y={0.02} rotation-x={-Math.PI / 2}>

@@ -153,6 +153,16 @@ export const playSound = (name, arg) => {
 // The bus game soundtracks play into.
 export const trackOut = () => trackBus;
 
+// For effects that need their own nodes: the context and the effects bus,
+// or null while audio isn't running (or sound is off).
+export const getAudio = () => (ctx && ctx.state === "running" && useStore.getState().sound ? { ctx, out: sfxBus } : null);
+
+// The audio clock, for timing things to the music; null without audio.
+export const audioTime = () => (ctx && ctx.state === "running" ? ctx.currentTime : null);
+
+// How far behind the clock the speakers are (large on Bluetooth headphones).
+export const audioLatency = () => (ctx ? (ctx.outputLatency || ctx.baseLatency || 0) : 0);
+
 // Lets the arcade register its own effects for playSound.
 export const addEffects = (effects) => Object.assign(EFFECTS, effects);
 

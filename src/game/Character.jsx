@@ -132,8 +132,9 @@ const Leg = ({ side, rigRef }) => (
     </group>
 );
 
-// `tool` is something held in the right hand (the arcade's blaster).
-export const Character = ({ rig, tool }) => {
+// `tool` is something held in the right hand (the arcade's blaster);
+// children are worn on the body (the stage guitar).
+export const Character = ({ rig, tool, children }) => {
     const set = (key) => (el) => {
         rig.current[key] = el;
     };
@@ -173,6 +174,7 @@ export const Character = ({ rig, tool }) => {
             </Arm>
             <Leg side={-1} rigRef={set("leftLeg")} />
             <Leg side={1} rigRef={set("rightLeg")} />
+            {children}
         </group>
     );
 };

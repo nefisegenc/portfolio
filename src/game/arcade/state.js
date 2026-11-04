@@ -5,13 +5,14 @@ import { track } from "../../analytics";
 import { useStore } from "../../store";
 import { getGame, worldYaw } from "../../data/arcade";
 import { setMusicTrack } from "../sound";
-import { bowlingMusic, huntMusic, raceMusic, silenceLoops } from "./audio";
+import { bowlingMusic, countIn, huntMusic, raceMusic, silenceLoops } from "./audio";
 
-const MUSIC = { bowling: bowlingMusic, race: raceMusic, bugs: huntMusic };
+// Riff Rush starts its band itself, on the beat.
+const MUSIC = { bowling: bowlingMusic, race: raceMusic, bugs: huntMusic, riff: countIn };
 // Games played under black light switch the island to night while they run.
-const NEON = new Set(["bowling", "bugs"]);
+const NEON = new Set(["bowling", "bugs", "riff"]);
 // Games played away from the island, which take the player there and back.
-const AWAY = new Set(["race", "bugs"]);
+const AWAY = new Set(["race", "bugs", "riff"]);
 let restoreDay = false;
 
 // Bumped whenever a game's scoring changes so old records don't carry over
@@ -65,6 +66,19 @@ export const arcadeLink = {
     bounds: null,
     // Which way the player should face while aiming (Bug Hunt), or null.
     aimYaw: null,
+    // Bug Hunt's touch aiming stick, { x, y } in screen terms, while held.
+    aimStick: null,
+    // A shove for the player ({ x, z } velocity), seconds of blinking after
+    // being hurt, and when they were last hurt (for the HUD's red flash).
+    push: null,
+    blink: 0,
+    hurt: 0,
+    // Riff Rush: a fret handler for the touch buttons, when the last note was
+    // strummed, and where in the beat the music is (0–1), for the player's
+    // strumming and bobbing.
+    fret: null,
+    strum: 0,
+    beat: 0,
 };
 
 const releasePlayer = () => {
@@ -77,6 +91,9 @@ const releasePlayer = () => {
     arcadeLink.floor = null;
     arcadeLink.bounds = null;
     arcadeLink.aimYaw = null;
+    arcadeLink.aimStick = null;
+    arcadeLink.push = null;
+    arcadeLink.blink = 0;
 };
 
 let messageId = 0;
@@ -151,7 +168,8 @@ export const useArcade = create((set, get) => ({
     // `extra` carries game-specific results for the HUD (a race position).
     finish: (score, extra) => {
         const { active, best } = get();
-        const record = beats(active, score, best[active]);
+        // A run that scored nothing (a show booed off at once) sets no record.
+        const record = score > 0 && beats(active, score, best[active]);
         if (record) {
             const next = { ...best, [active]: score };
             saveBest(next);

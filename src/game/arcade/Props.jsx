@@ -43,12 +43,7 @@ export const KartModel = ({ wheels, color = BODY, ...props }) => (
             <meshStandardMaterial color="#FFFFFF" />
         </mesh>
         {WHEEL_SPOTS.map(([x, z, front], i) => (
-            <group
-                key={i}
-                position={[x, 0.2, z]}
-                rotation-order="YXZ"
-                ref={wheels ? (el) => (wheels.current[i] = el && { el, front }) : undefined}
-            >
+            <group key={i} position={[x, 0.2, z]} rotation-order="YXZ" ref={wheels ? (el) => (wheels.current[i] = el && { el, front }) : undefined}>
                 <Wheel />
             </group>
         ))}

@@ -113,10 +113,14 @@ export const LANE = {
 // Bug Hunt's portal on the island: step through it to the arena.
 export const BUG_PORTAL = { x: 5.6, z: -0.6 };
 
+// A little stage at the back of the island, Riff Rush's way in.
+export const RIFF_STAGE = { x: 0.8, z: -11.3 };
+
 export const games = [
     { id: "bowling", color: "#8B5CF6", pad: { x: LANE.x, z: LANE.foulZ + 2.3 } },
     { id: "race", color: "#F97316", pad: { x: 2.4, z: 7.9 } },
     { id: "bugs", color: "#22C55E", pad: { x: BUG_PORTAL.x, z: BUG_PORTAL.z + 3.2 } },
+    { id: "riff", color: "#EC4899", pad: { x: RIFF_STAGE.x, z: RIFF_STAGE.z + 2.7 } },
 ].map((g) => {
     const [x, z] = toWorld(g.pad.x, g.pad.z);
     return { ...g, x, z };
@@ -163,6 +167,7 @@ const local = [
     ...[-1, 1].map((s) => ({ x: BUG_PORTAL.x + s * 1.9, z: BUG_PORTAL.z, r: 0.35 })),
     { x: PARKED_KART.x, z: PARKED_KART.z, r: 0.75 },
     { x: RACE_SIGN.x, z: RACE_SIGN.z, r: 0.4 },
+    ...[-1, 0, 1].map((s) => ({ x: RIFF_STAGE.x + s * 1.1, z: RIFF_STAGE.z, r: 0.85 })),
 ];
 
 export const arcadeColliders = [

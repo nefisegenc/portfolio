@@ -37,22 +37,29 @@ export const huntBounds = (pos) => {
     pos.z = HUNT.z + dz;
 };
 
-// Bug kinds: hit points, speed, size, colour, points, damage to the core.
+export const PLAYER_HP = 100;
+
+// Bug kinds: hit points, speed, size, colour, points, damage to the core,
+// damage when biting the player, and how close the player has to be before
+// a bug turns on them instead of the core (spitters keep their distance
+// and spit from `range`).
 export const KINDS = {
-    mite: { hp: 1, speed: 3.4, size: 0.42, color: "#EF4444", points: 10, damage: 2 },
-    beetle: { hp: 3, speed: 2.1, size: 0.64, color: "#F97316", points: 25, damage: 5 },
-    splitter: { hp: 3, speed: 1.9, size: 0.64, color: "#22C55E", points: 40, damage: 5 },
-    tank: { hp: 12, speed: 1.15, size: 1.05, color: "#8B5CF6", points: 120, damage: 12 },
-    boss: { hp: 90, speed: 0.75, size: 1.9, color: "#EC4899", points: 1000, damage: 40 },
+    mite: { hp: 1, speed: 3.4, size: 0.42, color: "#EF4444", points: 10, damage: 2, bite: 6, chase: 7 },
+    beetle: { hp: 3, speed: 2.2, size: 0.64, color: "#F97316", points: 25, damage: 5, bite: 10, chase: 4.5 },
+    splitter: { hp: 3, speed: 1.9, size: 0.64, color: "#FACC15", points: 40, damage: 5, bite: 10, chase: 4.5 },
+    spitter: { hp: 4, speed: 1.8, size: 0.58, color: "#A3E635", points: 50, damage: 4, bite: 8, range: 7.5 },
+    tank: { hp: 12, speed: 1.15, size: 1.05, color: "#8B5CF6", points: 120, damage: 12, bite: 20, chase: 0 },
+    boss: { hp: 110, speed: 0.75, size: 1.9, color: "#EC4899", points: 1000, damage: 40, bite: 30, chase: 0 },
 };
+export const GLOB_DAMAGE = 12;
 
 // What each wave sends (shuffled, the same way every time), and how quickly.
 const WAVE_MIX = [
-    { mite: 6, beetle: 4 },
-    { mite: 8, beetle: 5, splitter: 3 },
-    { mite: 10, beetle: 6, splitter: 4, tank: 1 },
-    { mite: 12, beetle: 7, splitter: 5, tank: 3 },
-    { mite: 10, beetle: 6, tank: 2 },
+    { mite: 8, beetle: 5 },
+    { mite: 10, beetle: 6, splitter: 4 },
+    { mite: 12, beetle: 7, splitter: 4, spitter: 3, tank: 1 },
+    { mite: 14, beetle: 8, splitter: 5, spitter: 4, tank: 3 },
+    { mite: 12, beetle: 8, spitter: 4, tank: 2 },
 ];
 export const waveList = (n) => {
     const list = Object.entries(WAVE_MIX[n - 1]).flatMap(([kind, count]) => Array(count).fill(kind));
@@ -66,4 +73,4 @@ export const waveList = (n) => {
     if (n === WAVES) list.splice(4, 0, "boss");
     return list;
 };
-export const spawnGap = (n) => Math.max(0.35, 1.1 - n * 0.15);
+export const spawnGap = (n) => Math.max(0.3, 1.0 - n * 0.14);

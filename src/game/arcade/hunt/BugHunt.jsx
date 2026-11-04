@@ -1,42 +1,68 @@
-// Bug Hunt: defend the server core through five waves of bugs. Hold the
-// action button to fire the debugger blaster (it locks onto the nearest
-// bug), grab the power-ups bugs drop, and chain kills for a combo.
+// Bug Hunt: defend the server core through five waves of bugs. You aim the
+// debugger blaster yourself (the mouse on a computer, a second stick on a
+// phone), keep it from overheating, and stay out of reach: bugs that get
+// close bite, spitters lob goo from a distance, and the boss does both.
+// Grab the power-ups bugs drop and chain kills for a combo.
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
-import { CanvasTexture, Color, Matrix4, Object3D, RepeatWrapping, SRGBColorSpace, Vector3 } from "three";
+import { CanvasTexture, Color, Matrix4, Object3D, Plane, RepeatWrapping, SRGBColorSpace, Vector3 } from "three";
 import { useT } from "../../../i18n";
 import { cameraState, playerState } from "../../input";
 import { Underside } from "../../Island";
-import { Box, Cyl, FONT, GlowMat, Shadowed } from "../../parts";
+import { Box, Cyl, FONT, GlowMat, InstanceColors, Shadowed } from "../../parts";
 import { playSound } from "../../sound";
 import { COUNTDOWN, tickCountdown } from "../countdown";
 import { arcadeLink, useArcade } from "../state";
-import { ARENA_RADIUS, CORE_HP, CORE_RADIUS, HUNT, KINDS, START, WAVES, huntBounds, portals, spawnGap, waveList } from "./arena";
+import {
+    ARENA_RADIUS,
+    CORE_HP,
+    CORE_RADIUS,
+    GLOB_DAMAGE,
+    HUNT,
+    KINDS,
+    PLAYER_HP,
+    START,
+    WAVES,
+    huntBounds,
+    portals,
+    spawnGap,
+    waveList,
+} from "./arena";
 
-const MAX_BUGS = 48;
+const MAX_BUGS = 56;
 const MAX_SHOTS = 48;
+const MAX_GLOBS = 48;
 const MAX_SPARKS = 320;
 const SHOT_SPEED = 26;
-const RANGE = 14;
+const GLOB_SPEED = 7.5;
+const MUZZLE_HEIGHT = 1.1;
 const PINK = "#EC4899";
 const CYAN = "#22D3EE";
-const POWERS = { rapid: "#FACC15", triple: CYAN, emp: PINK };
+const LIME = "#A3E635";
+const POWERS = { rapid: "#FACC15", triple: CYAN, emp: PINK, heal: "#22C55E" };
+// Heat per shot, how fast the blaster cools, and how long it locks up when
+// it overheats.
+const HEAT = { shot: 0.06, rapidShot: 0.035, cool: 0.55, lockout: 1.6 };
 
 // The camera hangs behind and above the player, always facing north, so
 // movement keys map straight onto the arena.
 const CAM_YAW = 0;
 const cam = { position: new Vector3(), target: new Vector3(), stiffness: 6, fov: 50 };
+const AIM_PLANE = new Plane(new Vector3(0, 1, 0), -(HUNT.y + MUZZLE_HEIGHT));
 
 // --- Simulation --------------------------------------------------------------
 
 const newWorld = () => ({
     bugs: [],
     shots: [],
+    globs: [],
     sparks: [],
     drops: [],
     core: CORE_HP,
     coreFlash: 0,
+    hp: PLAYER_HP,
+    invulnerable: 0,
     emp: 0,
 });
 
@@ -51,6 +77,8 @@ const newGame = () => ({
     combo: 0,
     comboT: 0,
     cooldown: 0,
+    heat: 0,
+    overheat: 0,
     rapid: 0,
     triple: 0,
     waveCore: CORE_HP,
@@ -62,7 +90,7 @@ const newGame = () => ({
 const spawnBug = (w, kind, x, z) => {
     if (w.bugs.length >= MAX_BUGS) return;
     const k = KINDS[kind];
-    w.bugs.push({ kind, x, z, hp: k.hp, flash: 0, wobble: Math.random() * 10, heading: 0, minion: 3 });
+    w.bugs.push({ kind, x, z, hp: k.hp, flash: 0, wobble: Math.random() * 10, heading: 0, minion: 3, spit: 1 + Math.random(), ring: 2 });
 };
 
 const burst = (w, x, y, z, color, count, power = 4) => {
@@ -83,6 +111,10 @@ const burst = (w, x, y, z, color, count, power = 4) => {
     }
 };
 
+const spit = (w, x, z, yaw) => {
+    if (w.globs.length < MAX_GLOBS) w.globs.push({ x, z, vx: Math.sin(yaw) * GLOB_SPEED, vz: Math.cos(yaw) * GLOB_SPEED, life: 3 });
+};
+
 const multiplier = (g) => Math.min(5, 1 + Math.floor(g.combo / 4));
 
 const kill = (w, g, bug, store) => {
@@ -90,8 +122,9 @@ const kill = (w, g, bug, store) => {
     g.combo += 1;
     g.comboT = 1.8;
     g.score += k.points * multiplier(g);
-    burst(w, bug.x, HUNT.y + k.size, bug.z, k.color, bug.kind === "boss" ? 140 : bug.kind === "tank" ? 50 : 16, bug.kind === "boss" ? 9 : 5);
-    playSound("bugDie", bug.kind === "tank" || bug.kind === "boss");
+    const big = bug.kind === "tank" || bug.kind === "boss";
+    burst(w, bug.x, HUNT.y + k.size, bug.z, k.color, bug.kind === "boss" ? 140 : big ? 50 : 16, bug.kind === "boss" ? 9 : 5);
+    playSound("bugDie", big);
     if (bug.kind === "boss") {
         g.shake = 0.9;
         store.say("hunt.bossDown", null, PINK);
@@ -100,17 +133,35 @@ const kill = (w, g, bug, store) => {
         spawnBug(w, "mite", bug.x + 0.4, bug.z);
         spawnBug(w, "mite", bug.x - 0.4, bug.z);
     }
-    const chance = { mite: 0.03, beetle: 0.08, splitter: 0.1, tank: 0.6, boss: 0 }[bug.kind];
+    const chance = { mite: 0.04, beetle: 0.08, splitter: 0.1, spitter: 0.15, tank: 0.6, boss: 0 }[bug.kind];
     if (Math.random() < chance) {
         const roll = Math.random();
-        w.drops.push({ x: bug.x, z: bug.z, kind: roll < 0.2 ? "emp" : roll < 0.6 ? "rapid" : "triple", life: 9 });
+        const kind = roll < 0.15 ? "emp" : roll < 0.4 ? "heal" : roll < 0.7 ? "rapid" : "triple";
+        w.drops.push({ x: bug.x, z: bug.z, kind, life: 9 });
     }
 };
 
-// One frame of the hunt: waves, bugs, shots, power-ups and the core.
-const stepHunt = (w, g, dt, store) => {
+// A bite or a glob: lose health, flinch away, and a moment's grace.
+const hurt = (w, g, damage, fromX, fromZ) => {
+    if (w.invulnerable > 0) return;
+    w.hp = Math.max(0, w.hp - damage);
+    w.invulnerable = 0.9;
+    const dx = playerState.x - fromX;
+    const dz = playerState.z - fromZ;
+    const d = Math.hypot(dx, dz) || 1;
+    arcadeLink.push = { x: (dx / d) * 9, z: (dz / d) * 9 };
+    arcadeLink.blink = 0.9;
+    arcadeLink.hurt = performance.now();
+    g.shake = Math.max(g.shake, 0.35);
+    playSound("hurt");
+};
+
+// One frame of the hunt: waves, bugs, shots, goo, power-ups, the core and
+// the player. `aim` is { yaw, firing } from whichever control is in use.
+const stepHunt = (w, g, dt, store, aim) => {
     const px = playerState.x;
     const pz = playerState.z;
+    w.invulnerable = Math.max(0, w.invulnerable - dt);
 
     // Waves: a short break, then the next wave's bugs come through the portals.
     if (g.between > 0) {
@@ -141,7 +192,7 @@ const stepHunt = (w, g, dt, store) => {
         g.score += bonus;
         if (g.wave === WAVES) {
             g.over = true;
-            g.score += w.core * 10;
+            g.score += w.core * 10 + w.hp * 5;
             playSound("finish");
             store.say("hunt.victory", null, "#22C55E");
             store.finish(g.score, { victory: true, wave: g.wave });
@@ -158,17 +209,38 @@ const stepHunt = (w, g, dt, store) => {
     g.rapid = Math.max(0, g.rapid - dt);
     g.triple = Math.max(0, g.triple - dt);
 
-    // Bugs crawl to the core, weaving a little and keeping apart.
+    // Bugs head for the core, unless the player strays close enough to be
+    // the better meal. Spitters keep their distance and spit.
     for (const b of w.bugs) {
         const k = KINDS[b.kind];
         b.wobble += dt * (4 + k.speed);
         b.flash = Math.max(0, b.flash - dt);
-        const dx = HUNT.x - b.x;
-        const dz = HUNT.z - b.z;
+        const toPlayer = Math.hypot(px - b.x, pz - b.z);
+        let tx = HUNT.x;
+        let tz = HUNT.z;
+        let pace = 1;
+        if (b.kind === "spitter") {
+            tx = px;
+            tz = pz;
+            // Back off when too close, circle when in range.
+            if (toPlayer < k.range - 2) pace = -1;
+            else if (toPlayer < k.range) pace = 0;
+            b.spit -= dt;
+            if (b.spit <= 0 && toPlayer < k.range + 2) {
+                b.spit = 1.9;
+                spit(w, b.x, b.z, Math.atan2(px - b.x, pz - b.z));
+                playSound("spit");
+            }
+        } else if (k.chase && toPlayer < k.chase) {
+            tx = px;
+            tz = pz;
+        }
+        const dx = tx - b.x;
+        const dz = tz - b.z;
         const d = Math.hypot(dx, dz) || 1;
-        const side = Math.sin(b.wobble * 0.5) * 0.5;
-        let vx = (dx / d) * k.speed + (-dz / d) * side;
-        let vz = (dz / d) * k.speed + (dx / d) * side;
+        const side = Math.sin(b.wobble * 0.5) * 0.5 + (pace === 0 ? 1.4 : 0);
+        let vx = (dx / d) * k.speed * pace + (-dz / d) * side;
+        let vz = (dz / d) * k.speed * pace + (dx / d) * side;
         for (const o of w.bugs) {
             if (o === b) continue;
             const ox = b.x - o.x;
@@ -182,8 +254,14 @@ const stepHunt = (w, g, dt, store) => {
         }
         b.x += vx * dt;
         b.z += vz * dt;
-        b.heading = Math.atan2(dx, dz);
-        // The boss drops mites as it goes.
+        b.heading = Math.atan2(tx - b.x, tz - b.z);
+        // Bites
+        if (toPlayer < k.size + 0.45) {
+            hurt(w, g, k.bite, b.x, b.z);
+            b.x -= ((px - b.x) / (toPlayer || 1)) * 0.6;
+            b.z -= ((pz - b.z) / (toPlayer || 1)) * 0.6;
+        }
+        // The boss lays mites and sprays goo in a ring.
         if (b.kind === "boss") {
             b.minion -= dt;
             if (b.minion <= 0) {
@@ -191,8 +269,14 @@ const stepHunt = (w, g, dt, store) => {
                 spawnBug(w, "mite", b.x + 1.5, b.z);
                 spawnBug(w, "mite", b.x - 1.5, b.z);
             }
+            b.ring -= dt;
+            if (b.ring <= 0) {
+                b.ring = 3.4;
+                for (let i = 0; i < 10; i++) spit(w, b.x, b.z, (i / 10) * Math.PI * 2 + b.wobble);
+                playSound("spit");
+            }
         }
-        if (d < CORE_RADIUS + k.size * 0.8) {
+        if (Math.hypot(HUNT.x - b.x, HUNT.z - b.z) < CORE_RADIUS + k.size * 0.8) {
             b.bit = true;
             w.core = Math.max(0, w.core - k.damage);
             w.coreFlash = 0.4;
@@ -202,38 +286,55 @@ const stepHunt = (w, g, dt, store) => {
         }
     }
     w.bugs = w.bugs.filter((b) => !b.bit);
-    if (w.core <= 0 && !g.over) {
+
+    // Goo flies straight; dodge it.
+    for (const o of w.globs) {
+        o.x += o.vx * dt;
+        o.z += o.vz * dt;
+        o.life -= dt;
+        if (Math.hypot(o.x - HUNT.x, o.z - HUNT.z) > ARENA_RADIUS + 1) o.life = 0;
+        if (o.life > 0 && Math.hypot(o.x - px, o.z - pz) < 0.55) {
+            o.life = 0;
+            burst(w, o.x, HUNT.y + 1, o.z, LIME, 10, 3);
+            hurt(w, g, GLOB_DAMAGE, o.x - o.vx, o.z - o.vz);
+        }
+    }
+    w.globs = w.globs.filter((o) => o.life > 0);
+
+    if ((w.core <= 0 || w.hp <= 0) && !g.over) {
         g.over = true;
         playSound("gameOver");
-        store.say("hunt.down", null, "#EF4444");
+        store.say(w.hp <= 0 ? "hunt.youDown" : "hunt.down", null, "#EF4444");
         store.finish(g.score, { victory: false, wave: g.wave });
         return;
     }
 
-    // Firing: lock onto the nearest bug in range and fire while held.
+    // The blaster: fires where it's aimed, heats up as it goes, and locks up
+    // for a moment if it overheats.
     g.cooldown -= dt;
-    let target = null;
-    let best = RANGE;
-    for (const b of w.bugs) {
-        const d = Math.hypot(b.x - px, b.z - pz);
-        if (d < best) {
-            best = d;
-            target = b;
-        }
+    if (g.overheat > 0) {
+        g.overheat -= dt;
+        if (g.overheat <= 0) g.heat = 0;
+    } else if (!aim.firing) {
+        g.heat = Math.max(0, g.heat - HEAT.cool * dt);
     }
-    const firing = arcadeLink.holding;
-    const yaw = target ? Math.atan2(target.x - px, target.z - pz) : playerState.rotY;
-    arcadeLink.aimYaw = firing || target ? yaw : null;
-    if (firing && g.cooldown <= 0) {
+    if (aim.firing && g.overheat <= 0 && g.cooldown <= 0) {
         g.cooldown = g.rapid > 0 ? 0.075 : 0.16;
         const spread = g.triple > 0 ? [-0.2, 0, 0.2] : [0];
         for (const a of spread) {
             if (w.shots.length >= MAX_SHOTS) break;
-            const dirX = Math.sin(yaw + a);
-            const dirZ = Math.cos(yaw + a);
+            const dirX = Math.sin(aim.yaw + a);
+            const dirZ = Math.cos(aim.yaw + a);
             w.shots.push({ x: px + dirX * 0.7, z: pz + dirZ * 0.7, vx: dirX * SHOT_SPEED, vz: dirZ * SHOT_SPEED, life: 0.7 });
         }
         playSound("laser");
+        g.heat += g.rapid > 0 ? HEAT.rapidShot : HEAT.shot;
+        if (g.heat >= 1) {
+            g.heat = 1;
+            g.overheat = HEAT.lockout;
+            playSound("overheat");
+            store.say("hunt.overheat", null, "#EF4444");
+        }
     }
 
     // Shots fly, and hit the first bug they touch.
@@ -265,8 +366,9 @@ const stepHunt = (w, g, dt, store) => {
             playSound("powerup");
             if (p.kind === "rapid") g.rapid = 7;
             if (p.kind === "triple") g.triple = 7;
+            if (p.kind === "heal") w.hp = Math.min(PLAYER_HP, w.hp + 30);
             if (p.kind === "emp") {
-                // Clears every bug near the player in one blast.
+                // Clears every bug and blob of goo near the player in one blast.
                 w.emp = 0.01;
                 playSound("emp");
                 g.shake = 0.6;
@@ -277,27 +379,29 @@ const stepHunt = (w, g, dt, store) => {
                     }
                 }
                 w.bugs = w.bugs.filter((b) => b.hp > 0);
+                w.globs = [];
             }
             store.say(`hunt.${p.kind}`, null, POWERS[p.kind]);
         }
     }
     w.drops = w.drops.filter((p) => p.life > 0);
 
-    // HUD, when something it shows has changed.
-    const summary = `${g.score}|${g.wave}|${multiplier(g)}|${Math.ceil(w.core)}|${g.rapid > 0}|${g.triple > 0}`;
+    // HUD, when something it shows has changed (heat in 5% steps).
+    const detail = {
+        wave: Math.max(1, g.wave),
+        waves: WAVES,
+        combo: multiplier(g),
+        core: w.core / CORE_HP,
+        hp: w.hp / PLAYER_HP,
+        heat: Math.round(g.heat * 20) / 20,
+        overheat: g.overheat > 0,
+        rapid: g.rapid > 0,
+        triple: g.triple > 0,
+    };
+    const summary = `${g.score}|${Object.values(detail).join("|")}`;
     if (summary !== g.published) {
         g.published = summary;
-        store.update({
-            score: g.score,
-            detail: {
-                wave: Math.max(1, g.wave),
-                waves: WAVES,
-                combo: multiplier(g),
-                core: w.core / CORE_HP,
-                rapid: g.rapid > 0,
-                triple: g.triple > 0,
-            },
-        });
+        store.update({ score: g.score, detail });
     }
 };
 
@@ -348,7 +452,7 @@ const makeGridTexture = () => {
 const glowByInstance = (shader) => {
     shader.fragmentShader = shader.fragmentShader.replace(
         "#include <emissivemap_fragment>",
-        "#include <emissivemap_fragment>\n#ifdef USE_INSTANCING_COLOR\ntotalEmissiveRadiance *= vColor;\n#endif",
+        "#include <emissivemap_fragment>\n#if defined( USE_COLOR ) || defined( USE_INSTANCING_COLOR )\ntotalEmissiveRadiance *= vColor;\n#endif"
     );
 };
 
@@ -432,7 +536,7 @@ const Core = ({ ringRef, crystalRef, lightRef }) => (
                 >
                     <GlowMat color={row % 2 ? CYAN : "#22C55E"} strength={1.3} />
                 </Box>
-            )),
+            ))
         )}
         <mesh ref={crystalRef} position-y={4.3}>
             <octahedronGeometry args={[0.6, 0]} />
@@ -465,8 +569,49 @@ const shot = new Object3D();
 shot.rotation.order = "YXZ";
 const body = new Matrix4();
 const out = new Matrix4();
+const aimPoint = new Vector3();
 const white = new Color("#FFFFFF");
 const KIND_COLOR = Object.fromEntries(Object.entries(KINDS).map(([kind, k]) => [kind, new Color(k.color)]));
+
+const setCursor = (el, cursor) => {
+    el.style.cursor = cursor;
+};
+
+// Mouse aiming: tracks whether a mouse is in use, and fires while its
+// button is held over the scene. The cursor turns into a crosshair.
+const useMouseAim = (active, aimMode) => {
+    const gl = useThree((s) => s.gl);
+    useEffect(() => {
+        if (!active) return;
+        const el = gl.domElement;
+        const move = (e) => {
+            if (e.pointerType === "mouse") aimMode.current = "mouse";
+        };
+        const down = (e) => {
+            if (e.pointerType !== "mouse" || e.button !== 0) return;
+            aimMode.current = "mouse";
+            arcadeLink.holding = true;
+            setCursor(el, "crosshair");
+        };
+        const up = (e) => {
+            if (e.pointerType !== "mouse" || e.button !== 0) return;
+            arcadeLink.holding = false;
+            setCursor(el, "crosshair");
+        };
+        setCursor(el, "crosshair");
+        el.addEventListener("pointermove", move);
+        el.addEventListener("pointerdown", down);
+        window.addEventListener("pointerup", up);
+        return () => {
+            el.removeEventListener("pointermove", move);
+            el.removeEventListener("pointerdown", down);
+            window.removeEventListener("pointerup", up);
+            setCursor(el, "grab");
+            arcadeLink.holding = false;
+            aimMode.current = "keys";
+        };
+    }, [active, gl, aimMode]);
+};
 
 export const BugHunt = () => {
     const active = useArcade((s) => s.active === "bugs");
@@ -474,7 +619,9 @@ export const BugHunt = () => {
     const world = useRef(newWorld());
     const game = useRef(null);
     const parts = useRef({});
+    const aimMode = useRef("keys");
     const set = (key) => (el) => (parts.current[key] = el);
+    useMouseAim(active, aimMode);
 
     useEffect(() => {
         world.current = newWorld();
@@ -489,7 +636,10 @@ export const BugHunt = () => {
         arcadeLink.bounds = huntBounds;
         game.current = newGame();
         playSound("beep");
-        useArcade.getState().update({ score: 0, detail: { wave: 1, waves: WAVES, combo: 1, core: 1, rapid: false, triple: false } });
+        useArcade.getState().update({
+            score: 0,
+            detail: { wave: 1, waves: WAVES, combo: 1, core: 1, hp: 1, heat: 0, overheat: false, rapid: false, triple: false },
+        });
     }, [active, run]);
 
     useLayoutEffect(() => {
@@ -499,32 +649,71 @@ export const BugHunt = () => {
         });
     }, []);
 
-    useFrame(({ clock }, rawDt) => {
+    useFrame(({ clock, camera, pointer, raycaster }, rawDt) => {
         const dt = Math.min(rawDt, 0.05);
         const t = clock.elapsedTime;
         const w = world.current;
         const g = game.current;
         const store = useArcade.getState();
         const m = parts.current;
+        const px = playerState.x;
+        const pz = playerState.z;
+
+        // Aim: the touch stick wins while it's held, then the mouse; with
+        // neither, the blaster fires the way the player is walking.
+        let yaw = playerState.rotY;
+        let firing = arcadeLink.holding;
+        let pointAt = false;
+        const stick = arcadeLink.aimStick;
+        if (stick && Math.hypot(stick.x, stick.y) > 0.25) {
+            yaw = Math.atan2(stick.x, stick.y);
+            firing = true;
+            arcadeLink.aimYaw = yaw;
+        } else if (aimMode.current === "mouse") {
+            raycaster.setFromCamera(pointer, camera);
+            if (raycaster.ray.intersectPlane(AIM_PLANE, aimPoint)) {
+                yaw = Math.atan2(aimPoint.x - px, aimPoint.z - pz);
+                pointAt = true;
+            }
+            arcadeLink.aimYaw = yaw;
+        } else {
+            arcadeLink.aimYaw = null;
+        }
 
         if (g && store.status === "countdown") {
             if (tickCountdown(g, dt)) arcadeLink.lock = null;
         } else if (g && store.status === "playing" && !g.over) {
-            stepHunt(w, g, dt, store);
+            stepHunt(w, g, dt, store, { yaw, firing });
         }
         stepEffects(w, dt);
 
-        // Camera and the player's lean towards the target.
+        // Camera
         if (g) {
             cameraState.yaw = CAM_YAW;
             const shake = g.shake > 0 ? g.shake : 0;
             g.shake = Math.max(0, g.shake - dt);
             // Portrait screens see less of the arena sideways, so pull back.
             const far = window.innerHeight > window.innerWidth ? 1.35 : 1;
-            cam.position.set(playerState.x + (Math.random() - 0.5) * shake, HUNT.y + 13.5 * far, playerState.z + 9.5 * far);
-            cam.target.set(playerState.x, HUNT.y + 0.5, playerState.z - 1.5);
+            cam.position.set(px + (Math.random() - 0.5) * shake, HUNT.y + 13.5 * far, pz + 9.5 * far);
+            cam.target.set(px, HUNT.y + 0.5, pz - 1.5);
             arcadeLink.camera = cam;
             arcadeLink.focus = { x: HUNT.x, z: HUNT.z };
+        }
+
+        // Aiming aids: a laser sight from the blaster, and a ring where the mouse points.
+        const playing = Boolean(g) && store.status === "playing";
+        m.sight.visible = playing;
+        if (playing) {
+            const hot = g.overheat > 0;
+            m.sight.position.set(px + Math.sin(yaw) * 3.2, HUNT.y + MUZZLE_HEIGHT, pz + Math.cos(yaw) * 3.2);
+            m.sight.rotation.set(0, yaw, 0);
+            m.sight.material.color.set(hot ? "#EF4444" : CYAN);
+            m.sight.material.opacity = hot ? 0.25 : 0.35;
+        }
+        m.reticle.visible = playing && pointAt;
+        if (m.reticle.visible) {
+            m.reticle.position.set(aimPoint.x, HUNT.y + 0.05, aimPoint.z);
+            m.reticle.rotation.z = t * 2;
         }
 
         // Bugs: glowing bodies, dark heads, bright eyes and scuttling legs.
@@ -576,13 +765,24 @@ export const BugHunt = () => {
         // Shots
         w.shots.forEach((s, i) => {
             // Capsules lie along their flight.
-            shot.position.set(s.x, HUNT.y + 1.1, s.z);
+            shot.position.set(s.x, HUNT.y + MUZZLE_HEIGHT, s.z);
             shot.rotation.set(Math.PI / 2, Math.atan2(s.vx, s.vz), 0);
             shot.updateMatrix();
             m.shots.setMatrixAt(i, shot.matrix);
         });
         m.shots.count = w.shots.length;
         m.shots.instanceMatrix.needsUpdate = true;
+
+        // Goo
+        w.globs.forEach((o, i) => {
+            tmp.position.set(o.x, HUNT.y + 1 + Math.sin(o.life * 12) * 0.08, o.z);
+            tmp.rotation.set(0, 0, 0);
+            tmp.scale.setScalar(0.28 + Math.sin(o.life * 20) * 0.03);
+            tmp.updateMatrix();
+            m.globs.setMatrixAt(i, tmp.matrix);
+        });
+        m.globs.count = w.globs.length;
+        m.globs.instanceMatrix.needsUpdate = true;
 
         // Sparks
         w.sparks.forEach((p, i) => {
@@ -618,7 +818,7 @@ export const BugHunt = () => {
         // EMP blast ring
         m.emp.visible = w.emp > 0;
         if (w.emp > 0) {
-            m.emp.position.set(playerState.x, HUNT.y + 0.4, playerState.z);
+            m.emp.position.set(px, HUNT.y + 0.4, pz);
             m.emp.scale.setScalar(1 + w.emp * 10);
             m.emp.material.opacity = 1 - w.emp;
         }
@@ -634,6 +834,7 @@ export const BugHunt = () => {
             <instancedMesh ref={set("body")} args={[undefined, undefined, MAX_BUGS]} castShadow frustumCulled={false}>
                 <sphereGeometry args={[1, 16, 12]} />
                 <meshStandardMaterial roughness={0.35} emissive="#FFFFFF" emissiveIntensity={0.55} onBeforeCompile={glowByInstance} />
+                <InstanceColors count={MAX_BUGS} />
             </instancedMesh>
             <instancedMesh ref={set("head")} args={[undefined, undefined, MAX_BUGS]} frustumCulled={false}>
                 <sphereGeometry args={[1, 12, 10]} />
@@ -651,9 +852,14 @@ export const BugHunt = () => {
                 <capsuleGeometry args={[0.07, 0.55, 4, 8]} />
                 <meshBasicMaterial color={CYAN} toneMapped={false} />
             </instancedMesh>
+            <instancedMesh ref={set("globs")} args={[undefined, undefined, MAX_GLOBS]} frustumCulled={false}>
+                <icosahedronGeometry args={[1, 1]} />
+                <meshBasicMaterial color={LIME} toneMapped={false} />
+            </instancedMesh>
             <instancedMesh ref={set("sparks")} args={[undefined, undefined, MAX_SPARKS]} frustumCulled={false}>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial emissive="#FFFFFF" emissiveIntensity={1.2} onBeforeCompile={glowByInstance} />
+                <InstanceColors count={MAX_SPARKS} />
             </instancedMesh>
             <group ref={set("drops")}>
                 {Array.from({ length: 6 }, (_, i) => (
@@ -670,9 +876,25 @@ export const BugHunt = () => {
                             <icosahedronGeometry args={[0.35, 0]} />
                             <GlowMat color={POWERS.emp} strength={3} />
                         </mesh>
+                        <group name="heal">
+                            <Box args={[0.6, 0.2, 0.2]}>
+                                <GlowMat color={POWERS.heal} strength={3} />
+                            </Box>
+                            <Box args={[0.2, 0.6, 0.2]}>
+                                <GlowMat color={POWERS.heal} strength={3} />
+                            </Box>
+                        </group>
                     </group>
                 ))}
             </group>
+            <mesh ref={set("sight")} visible={false}>
+                <boxGeometry args={[0.04, 0.04, 5]} />
+                <meshBasicMaterial color={CYAN} transparent opacity={0.35} toneMapped={false} depthWrite={false} />
+            </mesh>
+            <mesh ref={set("reticle")} rotation-x={-Math.PI / 2} visible={false}>
+                <ringGeometry args={[0.32, 0.42, 4]} />
+                <meshBasicMaterial color={CYAN} transparent opacity={0.85} toneMapped={false} depthWrite={false} />
+            </mesh>
             <mesh ref={set("emp")} rotation-x={-Math.PI / 2} visible={false}>
                 <ringGeometry args={[0.9, 1, 48]} />
                 <meshBasicMaterial color={PINK} transparent toneMapped={false} />

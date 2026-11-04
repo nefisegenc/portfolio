@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { MathUtils, Object3D } from "three";
 import { useStore } from "../store";
+import { useArcade } from "./arcade/state";
 import { ENTRANCE_DISTANCE, seeded } from "../data/world";
 import { usePalette } from "./theme";
 import { usePoster } from "./textures";
@@ -27,6 +28,13 @@ export const Shadowed = ({ children, cast = true, receive = true, ...props }) =>
             {children}
         </group>
     );
+};
+
+// Per-instance colours for an instanced mesh, there from the start so the
+// material is built to use them (colours set later would be ignored).
+export const InstanceColors = ({ count }) => {
+    const array = useMemo(() => new Float32Array(count * 3).fill(1), [count]);
+    return <instancedBufferAttribute attach="instanceColor" args={[array, 3]} />;
 };
 
 export const Mat = ({ color, ...props }) => (
@@ -78,7 +86,9 @@ export const Window = ({ w = 0.7, h = 0.8, color = "#FFD89A", frame = "#FFFFFF",
 );
 
 export const LandmarkLabel = ({ landmark, active, discovered }) => {
-    const playing = useStore((s) => s.phase === "playing");
+    // Labels float over everything, so they step aside while a game runs.
+    const inGame = useArcade((s) => Boolean(s.active));
+    const playing = useStore((s) => s.phase === "playing") && !inGame;
     const lang = useLang();
     return (
         <Html

@@ -1,6 +1,7 @@
 // Arcade sound: a soundtrack per game, one-shot effects and sustained loops
 // (engine, tyres, rolling ball). All synthesised, like the island's music.
-import { addEffects, makeLoop, noiseBurst, tone, trackOut } from "../sound";
+import { addEffects, audioTime, getAudio, makeLoop, noiseBurst, tone, trackOut } from "../sound";
+import { BAR, ROOTS, STEP as RIFF_STEP, TOTAL_BARS, sectionAt } from "./riff/song";
 
 // --- Instruments -------------------------------------------------------------
 
@@ -9,8 +10,7 @@ const snare = (start, volume = 0.22, long = false) => {
     noiseBurst({ start, freq: 1900, q: 0.6, duration: long ? 0.28 : 0.13, volume, bus: trackOut() });
     tone({ freq: 230, to: 150, type: "triangle", start, decay: 0.08, volume: volume * 0.4, bus: trackOut() });
 };
-const hat = (start, volume = 0.05, open = false) =>
-    noiseBurst({ start, freq: 9000, q: 0.9, duration: open ? 0.13 : 0.03, volume, bus: trackOut() });
+const hat = (start, volume = 0.05, open = false) => noiseBurst({ start, freq: 9000, q: 0.9, duration: open ? 0.13 : 0.03, volume, bus: trackOut() });
 const note = (freq, start, { type = "sawtooth", decay = 0.12, volume = 0.08, filter = 900, attack = 0.005 } = {}) =>
     tone({ freq, start, type, decay, volume, filter, attack, bus: trackOut() });
 
@@ -86,6 +86,91 @@ export const huntMusic = {
     },
 };
 
+// Hi-hat clicks on the beat while Riff Rush counts in, and nothing at all
+// once a show is over.
+export const countIn = { step: 0.5, play: (i, t) => hat(t, 0.06) };
+export const silence = { step: 1, play: () => {} };
+
+// Riff Rush's backing band: drums, bass and pads under the player's guitar,
+// following the song's bars. It notes when its first step sounds so the
+// chart can be timed against the audio clock.
+const RIFF_LEAD = [329.63, 392, 493.88, 587.33];
+export const riffMusic = {
+    step: RIFF_STEP,
+    startedAt: null,
+    play(i, t) {
+        if (i === 0) riffMusic.startedAt = (audioTime() ?? 0) + t;
+        const bar = Math.floor(i / 16);
+        const s = i % 16;
+        if (bar >= TOTAL_BARS) return;
+        const root = ROOTS[bar % 4];
+        const outro = bar === TOTAL_BARS - 1;
+        if (outro) {
+            if (s === 0) {
+                kick(t, 0.6);
+                noiseBurst({ start: t, freq: 6000, q: 0.5, duration: 1.8, volume: 0.16, bus: trackOut() });
+                note(root, t, { decay: 1.8, volume: 0.14, filter: 600 });
+            }
+            return;
+        }
+        if (s % 4 === 0) kick(t, 0.5);
+        if (s === 6 || s === 10) kick(t, 0.35);
+        if (s === 4 || s === 12) snare(t, 0.2);
+        if (s % 2 === 1) hat(t, 0.03);
+        if (s % 4 === 2) hat(t, 0.045, true);
+        if (s % 2 === 0) note(root * (s % 8 === 6 ? 2 : 1), t, { decay: 0.16, volume: 0.12, filter: 520 });
+        if (s === 0) RIFF_LEAD.slice(0, 3).forEach((f) => note(f / 2, t, { attack: 0.2, decay: BAR * 0.9, volume: 0.02, filter: 1200 }));
+        // A snare fill into each new section.
+        if (s >= 12 && sectionAt(bar) !== sectionAt(bar + 1)) snare(t, 0.1 + (s - 12) * 0.04);
+    },
+};
+
+// The player's guitar: two detuned saws through a soft clipper, a pluck
+// with a sustain for held notes.
+let clipCurve = null;
+const distortion = (ctx) => {
+    if (!clipCurve) {
+        clipCurve = new Float32Array(1024);
+        for (let i = 0; i < 1024; i++) {
+            const x = (i / 1023) * 2 - 1;
+            clipCurve[i] = Math.tanh(x * 6);
+        }
+    }
+    const node = ctx.createWaveShaper();
+    node.curve = clipCurve;
+    return node;
+};
+
+export const guitar = (freq, length = 0) => {
+    const audio = getAudio();
+    if (!audio) return;
+    const { ctx, out } = audio;
+    const t = ctx.currentTime;
+    const sustain = Math.max(0.18, length);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.16, t + 0.006);
+    gain.gain.exponentialRampToValueAtTime(0.09, t + 0.12);
+    gain.gain.setValueAtTime(0.09, t + sustain);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + sustain + 0.25);
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(4200, t);
+    lp.frequency.exponentialRampToValueAtTime(1800, t + sustain);
+    const drive = distortion(ctx);
+    const pre = ctx.createGain();
+    pre.gain.value = 0.5;
+    [1, 1.006, 0.5].forEach((ratio, k) => {
+        const osc = ctx.createOscillator();
+        osc.type = k === 2 ? "square" : "sawtooth";
+        osc.frequency.setValueAtTime(freq * ratio, t);
+        osc.connect(pre);
+        osc.start(t);
+        osc.stop(t + sustain + 0.3);
+    });
+    pre.connect(drive).connect(lp).connect(gain).connect(out);
+};
+
 // --- Loops ------------------------------------------------------------------
 
 export const engineLoop = makeLoop({ source: "osc", wave: "sawtooth", freq: 60 });
@@ -139,7 +224,9 @@ addEffects({
     strike: () => {
         noiseBurst({ duration: 1.8, freq: 1100, q: 0.35, volume: 0.22, attack: 0.25 });
         applause(1.8, 40, 1.2);
-        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone({ freq: f, start: 0.1 + i * 0.09, type: "square", decay: 0.4, volume: 0.05, filter: 2400 }));
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
+            tone({ freq: f, start: 0.1 + i * 0.09, type: "square", decay: 0.4, volume: 0.05, filter: 2400 })
+        );
     },
     spare: () => {
         noiseBurst({ duration: 1.1, freq: 1100, q: 0.35, volume: 0.14, attack: 0.2 });
@@ -189,13 +276,31 @@ addEffects({
     wave: () =>
         [329.63, 392, 493.88].forEach((f) => tone({ freq: f, to: f * 2, type: "sawtooth", attack: 0.05, decay: 0.7, volume: 0.05, filter: 2200 })),
     powerup: () =>
-        [659.25, 830.61, 987.77, 1318.5].forEach((f, i) => tone({ freq: f, start: i * 0.05, type: "square", decay: 0.18, volume: 0.05, filter: 3500 })),
+        [659.25, 830.61, 987.77, 1318.5].forEach((f, i) =>
+            tone({ freq: f, start: i * 0.05, type: "square", decay: 0.18, volume: 0.05, filter: 3500 })
+        ),
     emp: () => {
         noiseBurst({ duration: 1.2, freq: 200, to: 4000, q: 0.6, volume: 0.25 });
         tone({ freq: 80, to: 30, type: "sine", decay: 1, volume: 0.4 });
     },
+    hurt: () => {
+        tone({ freq: 180, to: 90, type: "square", decay: 0.18, volume: 0.07, filter: 1200 });
+        noiseBurst({ duration: 0.15, freq: 600, q: 0.8, volume: 0.15 });
+    },
+    spit: () => noiseBurst({ duration: 0.18, freq: 1400, to: 500, q: 2.5, volume: 0.1 }),
+    overheat: () => {
+        noiseBurst({ duration: 0.9, freq: 3500, to: 1500, q: 0.7, volume: 0.15, attack: 0.03 });
+        tone({ freq: 880, to: 440, type: "square", decay: 0.3, volume: 0.04, filter: 2000 });
+    },
     gameOver: () =>
         [392, 349.23, 311.13, 261.63].forEach((f, i) => tone({ freq: f, start: i * 0.2, type: "square", decay: 0.35, volume: 0.06, filter: 1800 })),
+    // Riff Rush
+    clunk: () => noiseBurst({ duration: 0.12, freq: 700, q: 3, volume: 0.12 }),
+    crowd: (level = 1) => {
+        noiseBurst({ duration: 1.4, freq: 1000, q: 0.35, volume: 0.16 * level, attack: 0.2 });
+        applause(1.4, Math.round(24 * level), level);
+    },
+    boo: () => tone({ freq: 140, to: 110, type: "sawtooth", attack: 0.2, decay: 1.2, volume: 0.06, filter: 500 }),
     cheer: () => {
         [659.25, 783.99, 1046.5].forEach((f, i) => tone({ freq: f, start: i * 0.09, decay: 0.6, volume: 0.12, type: "triangle" }));
         applause(1.2, 20, 0.8);

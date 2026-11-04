@@ -20,6 +20,19 @@ const Stat = ({ label, value, color }) => (
     </div>
 );
 
+// A labelled gauge; health bars go from green to red as they empty.
+const Bar = ({ label, value, color }) => (
+    <div className="flex items-center gap-1.5">
+        <span className="w-12 text-[9px] font-extrabold uppercase tracking-wider text-ink-soft">{label}</span>
+        <span className="h-2 flex-1 overflow-hidden rounded-full bg-ink/10">
+            <span
+                className="block h-full rounded-full transition-[width] duration-200"
+                style={{ width: `${Math.round(value * 100)}%`, background: color ?? (value > 0.5 ? "#22C55E" : value > 0.25 ? "#F59E0B" : "#EF4444") }}
+            />
+        </span>
+    </div>
+);
+
 // A score sheet: each frame's marks over its running total.
 const BowlingSheet = ({ detail }) => {
     const totals = frameTotals(detail.frames);
@@ -112,24 +125,34 @@ const ScoreCard = ({ active }) => {
                 {detail && <Stat label={t("game.lapOf", { n: detail.lap, total: detail.laps })} value={`${time.toFixed(1)}s`} />}
             </>
         );
+    } else if (active === "riff" && detail) {
+        stats = (
+            <>
+                <Stat label={t("game.score")} value={score} color={game.color} />
+                <Stat label={t("game.mult")} value={`x${detail.mult}`} color={detail.mult > 1 ? "#F59E0B" : undefined} />
+                <Stat label={t("game.combo")} value={detail.combo} />
+                <div className="w-28 space-y-1">
+                    <Bar label={t("game.crowd")} value={detail.rock} />
+                    <Bar label={t("game.song")} value={detail.progress} color="#A78BFA" />
+                </div>
+            </>
+        );
     } else if (detail) {
         stats = (
             <>
                 <Stat label={t("game.wave")} value={`${detail.wave}/${detail.waves}`} />
                 <Stat label={t("game.score")} value={score} color={game.color} />
                 <Stat label={t("game.combo")} value={`x${detail.combo}`} color={detail.combo > 1 ? "#F59E0B" : undefined} />
-                <div className="w-24">
-                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">{t("game.core")}</p>
-                    <div className="mt-1 h-3 overflow-hidden rounded-full bg-ink/10">
-                        <div
-                            className="h-full rounded-full transition-[width] duration-300"
-                            style={{ width: `${Math.round(detail.core * 100)}%`, background: detail.core > 0.5 ? "#22C55E" : detail.core > 0.25 ? "#F59E0B" : "#EF4444" }}
-                        />
-                    </div>
-                    <p className="mt-1 flex h-4 gap-1 text-[10px] font-extrabold uppercase">
-                        {detail.rapid && <span className="rounded bg-[#FACC15] px-1">{t("hunt.rapid")}</span>}
-                        {detail.triple && <span className="rounded bg-[#22D3EE] px-1">{t("hunt.triple")}</span>}
-                    </p>
+                <div className="w-28 space-y-1">
+                    <Bar label={t("game.core")} value={detail.core} />
+                    <Bar label={t("game.you")} value={detail.hp} />
+                    <Bar label={t("game.heat")} value={detail.heat} color={detail.overheat ? "#EF4444" : detail.heat > 0.7 ? "#F97316" : "#22D3EE"} />
+                    {(detail.rapid || detail.triple) && (
+                        <p className="flex gap-1 text-[10px] font-extrabold uppercase">
+                            {detail.rapid && <span className="rounded bg-[#FACC15] px-1">{t("hunt.rapid")}</span>}
+                            {detail.triple && <span className="rounded bg-[#22D3EE] px-1">{t("hunt.triple")}</span>}
+                        </p>
+                    )}
                 </div>
             </>
         );
@@ -229,6 +252,21 @@ const Results = ({ active, result }) => {
             </p>
             <p className="font-display text-sm font-bold text-ink-soft">{t("game.result")}</p>
             <p className="font-display text-6xl font-extrabold leading-none tabular-nums">{formatScore(active, result.score)}</p>
+            {result.extra?.stars !== undefined && (
+                <div className="mt-2">
+                    {result.extra.failed ? (
+                        <p className="font-display text-lg font-extrabold text-[#EF4444]">{t("riff.booed")}</p>
+                    ) : (
+                        <p className="font-display text-3xl tracking-widest text-[#F59E0B]" aria-label={`${result.extra.stars}/5`}>
+                            {"★".repeat(result.extra.stars)}
+                            <span className="text-ink/15">{"★".repeat(5 - result.extra.stars)}</span>
+                        </p>
+                    )}
+                    <p className="text-sm font-bold text-ink-soft">
+                        {t("game.accuracy", { n: result.extra.accuracy })} · {t("game.maxCombo", { n: result.extra.maxCombo })}
+                    </p>
+                </div>
+            )}
             {result.extra?.wave && (
                 <p className="mt-1 font-display text-lg font-extrabold" style={{ color: result.extra.victory ? "#22C55E" : "#EF4444" }}>
                     {result.extra.victory ? t("hunt.victory") : t("game.reachedWave", { n: result.extra.wave })}
@@ -244,9 +282,11 @@ const Results = ({ active, result }) => {
                     <StarIcon size={16} /> {t("game.newBest")}
                 </p>
             ) : (
-                <p className="mt-3 text-sm font-bold text-ink-soft">
-                    {t("game.best")}: {formatScore(active, result.previous)}
-                </p>
+                result.previous !== undefined && (
+                    <p className="mt-3 text-sm font-bold text-ink-soft">
+                        {t("game.best")}: {formatScore(active, result.previous)}
+                    </p>
+                )
             )}
             <div className="mt-5 flex justify-center gap-2">
                 <button className="btn btn-ghost" onClick={quit}>
@@ -372,6 +412,74 @@ const RaceGauges = () => {
     );
 };
 
+// Bug Hunt's second stick on touch screens: drag to aim, and it fires
+// while held.
+const AimStick = () => {
+    const base = useRef();
+    const knob = useRef();
+    const pointer = useRef(null);
+    const t = useT();
+    const RANGE = 46;
+    const release = () => {
+        pointer.current = null;
+        if (knob.current) knob.current.style.transform = "";
+        arcadeLink.aimStick = null;
+    };
+    useEffect(() => () => (arcadeLink.aimStick = null), []);
+    const update = (e) => {
+        const rect = base.current.getBoundingClientRect();
+        let dx = e.clientX - (rect.left + rect.width / 2);
+        let dy = e.clientY - (rect.top + rect.height / 2);
+        const d = Math.hypot(dx, dy);
+        if (d > RANGE) {
+            dx *= RANGE / d;
+            dy *= RANGE / d;
+        }
+        knob.current.style.transform = `translate(${dx}px, ${dy}px)`;
+        arcadeLink.aimStick = { x: dx / RANGE, y: dy / RANGE };
+    };
+    return (
+        <div className="pointer-events-none fixed bottom-0 right-0 z-10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <div
+                ref={base}
+                aria-label={t("game.aim")}
+                className="pointer-events-auto relative h-[132px] w-[132px] touch-none rounded-full border-[3px] border-[#22C55E]/80 bg-ink/25 shadow-lg backdrop-blur-sm"
+                onPointerDown={(e) => {
+                    pointer.current = e.pointerId;
+                    update(e);
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                }}
+                onPointerMove={(e) => e.pointerId === pointer.current && update(e)}
+                onPointerUp={release}
+                onPointerCancel={release}
+            >
+                <div
+                    ref={knob}
+                    className="absolute left-1/2 top-1/2 -ml-8 -mt-8 grid h-16 w-16 place-items-center rounded-full border-[3px] border-white bg-[#22C55E] font-display text-sm font-extrabold text-white shadow-[0_4px_0_rgb(42_35_64/0.25)]"
+                >
+                    {t("game.aim")}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// A red flash round the screen edges when the player gets hurt.
+const HurtFlash = () => {
+    const ref = useRef();
+    useEffect(() => {
+        let frame;
+        const tick = () => {
+            const since = (performance.now() - arcadeLink.hurt) / 1000;
+            if (ref.current) ref.current.style.opacity = since < 0.5 ? String(1 - since / 0.5) : "0";
+            frame = requestAnimationFrame(tick);
+        };
+        tick();
+        return () => cancelAnimationFrame(frame);
+    }, []);
+    return <div ref={ref} className="pointer-events-none fixed inset-0 z-30 opacity-0 shadow-[inset_0_0_120px_40px_rgba(239,68,68,0.75)]" />;
+};
+
 // The game's action button on touch screens, beside the joystick.
 const TouchAction = ({ color, label }) => (
     <div className="pointer-events-none fixed bottom-0 right-0 z-10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
@@ -379,11 +487,64 @@ const TouchAction = ({ color, label }) => (
     </div>
 );
 
+// Riff Rush's last hit or miss, popping up over the highway.
+const RiffJudge = () => {
+    const judge = useArcade((s) => (s.active === "riff" ? s.detail?.judge : null));
+    const id = useArcade((s) => s.detail?.judgeId);
+    const t = useT();
+    return (
+        <AnimatePresence>
+            {judge && (
+                <motion.p
+                    key={id}
+                    className="game-title pointer-events-none fixed inset-x-0 top-[52%] z-20 text-center text-3xl md:text-4xl"
+                    style={{ color: judge.color }}
+                    initial={{ opacity: 0, scale: 0.6, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -14 }}
+                    transition={{ duration: 0.12 }}
+                >
+                    {t(judge.key)}
+                </motion.p>
+            )}
+        </AnimatePresence>
+    );
+};
+
+const FRET_COLORS = ["#22C55E", "#EF4444", "#FACC15", "#3B82F6", "#F97316"];
+
+// Five fret buttons along the bottom on touch screens.
+const RiffTouch = () => {
+    useEffect(() => () => [0, 1, 2, 3, 4].forEach((lane) => arcadeLink.fret?.(lane, false)), []);
+    return (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 flex justify-center gap-2 px-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {FRET_COLORS.map((c, lane) => {
+                const up = () => arcadeLink.fret?.(lane, false);
+                return (
+                    <button
+                        key={c}
+                        aria-label={`${lane + 1}`}
+                        className="pointer-events-auto h-16 flex-1 touch-none rounded-2xl border-[3px] border-white/80 shadow-[0_4px_0_rgb(42_35_64/0.3)] active:translate-y-1 active:brightness-125"
+                        style={{ background: c, maxWidth: 76 }}
+                        onPointerDown={(e) => {
+                            arcadeLink.fret?.(lane, true);
+                            e.currentTarget.setPointerCapture(e.pointerId);
+                        }}
+                        onPointerUp={up}
+                        onPointerCancel={up}
+                    />
+                );
+            })}
+        </div>
+    );
+};
+
 const KEY_HELP = {
     bowling: [["←", "→"], ["key.space"]],
     hook: [["←", "→"]],
     race: [["W", "A", "S", "D"], ["key.space"]],
-    bugs: [["W", "A", "S", "D"], ["key.space"]],
+    bugs: [["W", "A", "S", "D"], ["key.mouse"]],
+    riff: [["D", "F", "J", "K", "L"]],
 };
 
 const KeyHelp = ({ active }) => {
@@ -447,7 +608,10 @@ export const GameHud = () => {
             {active === "bowling" && <PowerMeter />}
             {active === "race" && status !== "done" && <RaceGauges />}
             {active === "race" && status === "playing" && isTouch && <TouchAction color="#2563EB" label={t("game.nitro")} />}
-            {active === "bugs" && status === "playing" && isTouch && <TouchAction color="#22C55E" label={t("game.fire")} />}
+            {active === "bugs" && status === "playing" && isTouch && <AimStick />}
+            {active === "bugs" && <HurtFlash />}
+            {active === "riff" && <RiffJudge />}
+            {active === "riff" && status === "playing" && isTouch && <RiffTouch />}
             {active && status !== "done" && !isTouch && <KeyHelp active={active} />}
         </>
     );

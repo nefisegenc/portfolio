@@ -19,6 +19,7 @@ import {
     PAD_RADIUS,
     PARKED_KART,
     RACE_SIGN,
+    RIFF_STAGE,
     SIGNPOST,
     bridgeDir,
     bridgePoint,
@@ -31,6 +32,7 @@ import { TopLayer, Underside } from "../Island";
 import { Ball, Box, Cyl, FONT, GlowMat, Shadowed } from "../parts";
 import { formatScore } from "./format";
 import { KartModel } from "./Props";
+import { Guitar } from "./riff/Riff";
 import { useArcade } from "./state";
 
 const WOOD = "#8B5E3C";
@@ -89,8 +91,18 @@ const Bridge = () => {
                     {posts.map((z) => (
                         <Box key={z} args={[0.14, 1.1, 0.14]} position={[s * side, 0.5, z]} color={WOOD} castShadow />
                     ))}
-                    <Cyl args={[0.035, 0.035, length, 5]} position={[s * side, 0.95, BRIDGE_START + length / 2]} rotation-x={Math.PI / 2} color={ROPE} />
-                    <Cyl args={[0.025, 0.025, length, 5]} position={[s * side, 0.55, BRIDGE_START + length / 2]} rotation-x={Math.PI / 2} color={ROPE} />
+                    <Cyl
+                        args={[0.035, 0.035, length, 5]}
+                        position={[s * side, 0.95, BRIDGE_START + length / 2]}
+                        rotation-x={Math.PI / 2}
+                        color={ROPE}
+                    />
+                    <Cyl
+                        args={[0.025, 0.025, length, 5]}
+                        position={[s * side, 0.55, BRIDGE_START + length / 2]}
+                        rotation-x={Math.PI / 2}
+                        color={ROPE}
+                    />
                 </group>
             ))}
         </group>
@@ -138,14 +150,7 @@ const Arch = () => {
                 <Box args={[4.6, 0.8, 0.36]} position={[0, 2.75, 0]} color="#2A2340" />
             </Shadowed>
             {[1, -1].map((s) => (
-                <Text
-                    key={s}
-                    font={FONT}
-                    fontSize={0.46}
-                    position={[0, 2.78, s * 0.2]}
-                    rotation-y={s < 0 ? Math.PI : 0}
-                    anchorY="middle"
-                >
+                <Text key={s} font={FONT} fontSize={0.46} position={[0, 2.78, s * 0.2]} rotation-y={s < 0 ? Math.PI : 0} anchorY="middle">
                     {t("arcade.name").toUpperCase()}
                     <GlowMat color={ARCADE_COLOR} strength={2.4} />
                 </Text>
@@ -186,7 +191,7 @@ const ScoreBoard = () => {
             {games.map((g, i) => (
                 <BoardLine
                     key={g.id}
-                    y={3.2 - i * 0.48}
+                    y={3.28 - i * 0.42}
                     color={g.color}
                     label={t(`game.${g.id}`)}
                     value={best[g.id] === undefined ? "—" : formatScore(g.id, best[g.id])}
@@ -257,6 +262,7 @@ const WALKWAYS = [
     [ENTRY.x, ENTRY.z + 1.5, BOARD.x, BOARD.z + 0.6],
     [0, 5.2, games[0].pad.x + 0.8, games[0].pad.z],
     [0, 2.8, games[2].pad.x - 0.6, games[2].pad.z + 0.4],
+    [BOARD.x, BOARD.z - 0.6, games[3].pad.x, games[3].pad.z + 0.5],
 ];
 
 const Walkways = () =>
@@ -327,6 +333,36 @@ const BugPortal = () => {
     );
 };
 
+// Riff Rush's way in: a little stage with a guitar on its stand, speakers
+// and a neon sign.
+const RiffCorner = () => {
+    const t = useT();
+    return (
+        <group position={[RIFF_STAGE.x, 0, RIFF_STAGE.z]}>
+            <Shadowed>
+                <Box args={[3.8, 0.45, 1.8]} position-y={0.225} color="#14111F" />
+                {[-1.45, 1.45].map((x) => (
+                    <Box key={x} args={[0.7, 1.3, 0.6]} position={[x, 1.1, -0.3]} color="#0B0A14" />
+                ))}
+                {[-1.8, 1.8].map((x) => (
+                    <Box key={`p${x}`} args={[0.14, 3.3, 0.14]} position={[x, 1.65, -0.75]} color="#1C1730" />
+                ))}
+                <Box args={[3.9, 0.85, 0.16]} position={[0, 3.2, -0.75]} color="#0B0A14" />
+            </Shadowed>
+            <Box args={[3.85, 0.06, 0.06]} position={[0, 0.46, 0.9]}>
+                <GlowMat color="#EC4899" strength={1.8} />
+            </Box>
+            <group position={[0, 0.95, 0.1]} rotation={[0.15, 0, 1.25]}>
+                <Guitar />
+            </group>
+            <Text font={FONT} fontSize={0.48} position={[0, 3.22, -0.65]} anchorY="middle">
+                {t("game.riff").toUpperCase()}
+                <GlowMat color="#EC4899" strength={2.2} />
+            </Text>
+        </group>
+    );
+};
+
 // Children are placed in arcade space.
 export const ArcadeIsland = ({ children }) => (
     <>
@@ -340,6 +376,7 @@ export const ArcadeIsland = ({ children }) => (
             <ScoreBoard />
             <RaceCorner />
             <BugPortal />
+            <RiffCorner />
             {games.map((g) => (
                 <Pad key={g.id} game={g} />
             ))}
