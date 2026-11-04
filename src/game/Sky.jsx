@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Billboard, Stars } from "@react-three/drei";
-import { BackSide, Color } from "three";
+import { BackSide, Color, Vector3 } from "three";
 import { useStore } from "../store";
+import { useArcade } from "./arcade/state";
 import { seeded } from "../data/world";
 import { usePalette } from "./theme";
 
@@ -104,11 +105,20 @@ const CLOUDS = (() => {
     });
 })();
 
+const cloudSpot = new Vector3();
+
 const Clouds = () => {
     const p = usePalette();
     const ref = useRef();
-    useFrame((_, dt) => {
+    useFrame(({ camera }, dt) => {
         ref.current.rotation.y += dt * 0.006;
+        // The games played off the islands sit out in the ring the clouds
+        // drift round, so while one is on any cloud drifting near the camera
+        // steps aside rather than covering the view.
+        const playing = Boolean(useArcade.getState().active);
+        for (const cloud of ref.current.children) {
+            cloud.visible = !playing || cloud.getWorldPosition(cloudSpot).distanceTo(camera.position) > 40;
+        }
     });
     return (
         <group ref={ref}>

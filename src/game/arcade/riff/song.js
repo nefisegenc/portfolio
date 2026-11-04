@@ -61,14 +61,22 @@ export const SECTIONS = [
     { name: "outro", bars: ["o1", "o2"] },
 ];
 
-const BARS = SECTIONS.flatMap((s) => s.bars.map((pattern) => ({ pattern, section: s.name })));
+// The song eases you in: the first verse keeps only notes on every other
+// beat, the first pre-chorus those on the beat, the first chorus those on
+// eighth notes, all with chords played as single notes. From the second
+// verse on, it's the full chart. (The grid each level keeps, in steps.)
+const EASE_IN = [0, 0, 1, 2];
+const GRID = [8, 4, 2, 1];
+const BARS = SECTIONS.flatMap((s, i) => s.bars.map((pattern) => ({ pattern, section: s.name, level: EASE_IN[i] ?? 3 })));
 export const TOTAL_BARS = BARS.length + 1;
 export const SONG_LENGTH = TOTAL_BARS * BAR;
 export const sectionAt = (bar) => BARS[Math.min(bar, BARS.length - 1)]?.section ?? "outro";
 
 // Every note: { time, lane, length (seconds, 0 for a tap), bar }.
-export const CHART = BARS.flatMap(({ pattern }, bar) =>
-    (pattern ? parse(P[pattern]) : []).flatMap(([step, lanes, length]) =>
-        lanes.map((lane) => ({ time: (bar * 16 + step) * STEP, lane, length: length * STEP, bar }))
-    )
+export const CHART = BARS.flatMap(({ pattern, level }, bar) =>
+    (pattern ? parse(P[pattern]) : [])
+        .filter(([step]) => step % GRID[level] === 0)
+        .flatMap(([step, lanes, length]) =>
+            (level < 3 ? lanes.slice(0, 1) : lanes).map((lane) => ({ time: (bar * 16 + step) * STEP, lane, length: length * STEP, bar }))
+        )
 ).sort((a, b) => a.time - b.time || a.lane - b.lane);

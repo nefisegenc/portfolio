@@ -20,8 +20,18 @@ import { DECK, PLAYER_SPOT, STAGE, STAGE_YAW, stageToWorld } from "./stage";
 
 const RADIUS = 15;
 const HIGHWAY = { near: 7, far: -6.5, y: 0.7, lane: 1 };
-const LOOK_AHEAD = 2;
-const NOTE_SPEED = (HIGHWAY.near - HIGHWAY.far) / LOOK_AHEAD;
+// The song starts gentle and builds: notes start slow, with roomy timing,
+// and speed up (and the timing tightens) over the first minute and a bit.
+// `look` is how long a note takes to come down the highway.
+const LOOK_SLOW = 3;
+const LOOK_FAST = 1.8;
+const ramp = (t) => {
+    const k = Math.max(0, Math.min(1, (t - 4) / 70));
+    return k * k * (3 - 2 * k);
+};
+const lookAhead = (t) => LOOK_SLOW + (LOOK_FAST - LOOK_SLOW) * ramp(t);
+// Timing windows start half as wide again as they end up.
+const leniency = (t) => 1.5 - 0.5 * ramp(t);
 const WINDOWS = [
     { name: "perfect", time: 0.045, points: 100, rock: 0.035, weight: 1, color: "#FACC15" },
     { name: "great", time: 0.09, points: 70, rock: 0.03, weight: 0.8, color: "#22D3EE" },
@@ -30,8 +40,8 @@ const WINDOWS = [
 const MISS = { rock: -0.03, color: "#EF4444" };
 const OVERSTRUM = -0.015;
 // The crowd can't turn on you in the first stretch of the song, while you
-// find the beat.
-const GRACE = 12;
+// find the beat, and early misses cost it less.
+const GRACE = 18;
 const BEAT = 60 / BPM;
 const KEYS = Object.fromEntries(FRET_KEYS.flatMap((k, lane) => [[`Key${k}`, lane], [`Digit${lane + 1}`, lane]]));
 const laneX = (lane) => (lane - (LANES - 1) / 2) * HIGHWAY.lane;
@@ -121,11 +131,13 @@ const fret = (g, sparks, lane, down, t) => {
         return;
     }
     // The closest unplayed note in this lane within reach.
+    const easy = leniency(t);
+    const reach = WINDOWS[2].time * easy;
     let best = null;
     for (let i = g.next; i < g.notes.length; i++) {
         const n = g.notes[i];
-        if (n.time > t + WINDOWS[2].time) break;
-        if (n.lane !== lane || n.state !== "pending" || Math.abs(n.time - t) > WINDOWS[2].time) continue;
+        if (n.time > t + reach) break;
+        if (n.lane !== lane || n.state !== "pending" || Math.abs(n.time - t) > reach) continue;
         if (!best || Math.abs(n.time - t) < Math.abs(best.time - t)) best = n;
     }
     if (!best) {
@@ -136,7 +148,7 @@ const fret = (g, sparks, lane, down, t) => {
         return;
     }
     const off = Math.abs(best.time - t);
-    const win = WINDOWS.find((w) => off <= w.time);
+    const win = WINDOWS.find((w) => off <= w.time * easy);
     best.state = best.length > 0 ? "holding" : "hit";
     best.heldTo = t;
     g.combo += 1;
@@ -155,17 +167,18 @@ const fret = (g, sparks, lane, down, t) => {
 
 // One frame of the song: misses, held notes, the crowd meter and the end.
 const stepSong = (g, sparks, t, dt, store) => {
+    const reach = WINDOWS[2].time * leniency(t);
     for (let i = g.next; i < g.notes.length; i++) {
         const n = g.notes[i];
-        if (n.time > t - WINDOWS[2].time) break;
+        if (n.time > t - reach) break;
         if (n.state === "pending") {
             n.state = "missed";
             g.combo = 0;
             g.judged += 1;
-            judge(g, "miss", MISS.color, MISS.rock);
+            judge(g, "miss", MISS.color, MISS.rock * (0.45 + 0.55 * ramp(t)));
         }
     }
-    while (g.next < g.notes.length && g.notes[g.next].state !== "pending" && g.notes[g.next].time < t - WINDOWS[2].time) g.next += 1;
+    while (g.next < g.notes.length && g.notes[g.next].state !== "pending" && g.notes[g.next].time < t - reach) g.next += 1;
 
     // Long notes score for as long as they're held.
     g.held.forEach((n, lane) => {
@@ -526,12 +539,14 @@ export const Riff = () => {
         // as it's played.
         let n = 0;
         let tails = 0;
+        const look = lookAhead(Math.max(0, t));
+        const speed = (HIGHWAY.near - HIGHWAY.far) / look;
         if (g && t > -1) {
             for (let i = Math.max(0, g.next - 6); i < g.notes.length && n < MAX_NOTES; i++) {
                 const note = g.notes[i];
-                if (note.time > t + LOOK_AHEAD) break;
-                const tail = note.length * NOTE_SPEED;
-                const z = HIGHWAY.near - (note.time - t) * NOTE_SPEED;
+                if (note.time > t + look) break;
+                const tail = note.length * speed;
+                const z = HIGHWAY.near - (note.time - t) * speed;
                 if (note.state === "hit" || note.state === "done") continue;
                 if (z - (note.state === "holding" ? tail : 0) > HIGHWAY.near + 2) continue;
                 const lane = note.lane;
@@ -550,7 +565,7 @@ export const Riff = () => {
                 }
                 if (note.length > 0 && tails < MAX_TAILS) {
                     const head = note.state === "holding" ? HIGHWAY.near : z;
-                    const end = HIGHWAY.near - (note.time + note.length - t) * NOTE_SPEED;
+                    const end = HIGHWAY.near - (note.time + note.length - t) * speed;
                     const len = Math.max(0, head - end);
                     if (len > 0.02) {
                         tmp.position.set(laneX(lane), HIGHWAY.y + 0.05, head - len / 2);
@@ -575,8 +590,8 @@ export const Riff = () => {
         let beats = 0;
         if (t > -1) {
             const first = Math.ceil(t / BEAT);
-            for (let b = first; b * BEAT < t + LOOK_AHEAD; b++) {
-                tmp.position.set(0, HIGHWAY.y + 0.012, HIGHWAY.near - (b * BEAT - t) * NOTE_SPEED);
+            for (let b = first; b * BEAT < t + look; b++) {
+                tmp.position.set(0, HIGHWAY.y + 0.012, HIGHWAY.near - (b * BEAT - t) * speed);
                 tmp.rotation.set(-Math.PI / 2, 0, 0);
                 tmp.scale.set(1, b % 4 === 0 ? 2.5 : 1, 1);
                 tmp.updateMatrix();
