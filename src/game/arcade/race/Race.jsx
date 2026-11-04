@@ -1,12 +1,13 @@
 // Sky Circuit race: three laps against three rivals. The player's kart is
 // simulated here (the player controller just shows the character in it):
 // throttle, steering, nitro, jumps, walls, falls and everything on the road
-// that gets in the way.
-import { useEffect, useRef } from "react";
+// that gets in the way. Obstacles are solid for everyone: karts are pushed
+// out of them, knocked about by them, and rivals steer to dodge them.
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Vector3 } from "three";
+import { CanvasTexture, Color, Object3D, SRGBColorSpace, Vector3 } from "three";
 import { input } from "../../input";
-import { Box, Cyl, GlowMat, Shadowed } from "../../parts";
+import { Box, Cyl, GlowMat, InstanceColors, Shadowed } from "../../parts";
 import { playSound } from "../../sound";
 import { engineHum, engineLoop, screechLoop } from "../audio";
 import { COUNTDOWN, tickCountdown } from "../countdown";
@@ -15,18 +16,20 @@ import { arcadeLink, useArcade } from "../state";
 import { RaceTrack } from "./RaceTrack";
 import {
     GAP_END_S,
+    HAMMER_ARM,
+    HAMMER_HEAD,
     HAMMER_HEIGHT,
-    KART_RADIUS,
     LAPS,
     LIP_S,
     ROAD_HALF,
     SAMPLES,
+    SLIDER,
     TRACK_LENGTH,
     boostPads,
     cones,
     cornerSpeed,
     hammerAngle,
-    hammerOffset,
+    hammerHead,
     hammers,
     heightAt,
     indexAt,
@@ -36,11 +39,15 @@ import {
     oilSlicks,
     roadPoint,
     sliderOffset,
+    sliderVelocity,
     sliders,
     track,
 } from "./track";
 
 const KART = { accel: 18, brake: 32, coast: 5, max: 21, nitro: 27, boost: 29, reverse: 5, steer: 2.1, gravity: 18 };
+// A kart for collisions: half its length and width, and the top of the
+// driver's helmet.
+const BODY = { halfS: 0.75, halfD: 0.5, top: 1.5 };
 const ORANGE = "#F97316";
 const RIVALS = [
     { color: "#22C55E", skill: 0.95, start: -4, lane: 1.8 },
@@ -48,6 +55,8 @@ const RIVALS = [
     { color: "#EAB308", skill: 0.98, start: -16, lane: 1.8 },
 ];
 const PLAYER_START = { dist: -12, lane: -1.8 };
+const MAX_SPARKS = 180;
+const SPARK_COLORS = [new Color("#FDE68A"), new Color("#FB923C"), new Color("#FFFFFF")];
 
 const damp = (lambda, dt) => 1 - Math.exp(-lambda * dt);
 
@@ -67,6 +76,7 @@ const deltaS = (a, b) => {
     if (d < -TRACK_LENGTH / 2) d += TRACK_LENGTH;
     return d;
 };
+const wrap = (s) => ((s % TRACK_LENGTH) + TRACK_LENGTH) % TRACK_LENGTH;
 
 // The circuit's outline for the HUD's map.
 const MAP = (() => {
@@ -89,6 +99,7 @@ const newPlayer = () => {
         z: p.z,
         heading: p.heading,
         speed: 0,
+        lv: 0,
         vy: 0,
         grounded: true,
         idx: indexAt(PLAYER_START.dist),
@@ -98,17 +109,132 @@ const newPlayer = () => {
         boost: 0,
         stun: 0,
         spin: 0,
-        hitCooldown: 0,
+        touching: new Set(),
         lastSafe: indexAt(PLAYER_START.dist),
         wheel: 0,
         shake: 0,
+        jolt: 0,
         finished: false,
     };
 };
 
-const newRival = (r) => ({ ...r, dist: r.start, d: r.lane, speed: 0, wheel: 0, finishedAt: null });
+const newRival = (r) => ({
+    ...r,
+    dist: r.start,
+    d: r.lane,
+    speed: 0,
+    lv: 0,
+    stun: 0,
+    spin: 0,
+    spinV: 0,
+    hop: 0,
+    hopV: 0,
+    touching: new Set(),
+    finishedAt: null,
+});
+
+// --- Collisions -------------------------------------------------------------
+
+// What a kart at road position (s, d), `h` above the road, is touching.
+const contactsAt = (s, d, h, now) => {
+    const out = [];
+    sliders.forEach((b, i) => {
+        const off = sliderOffset(b, now);
+        const ds = deltaS(s, b.s);
+        const dd = d - off;
+        const ps = SLIDER.halfS + BODY.halfS - Math.abs(ds);
+        const pd = SLIDER.halfD + BODY.halfD - Math.abs(dd);
+        if (ps <= 0 || pd <= 0 || h > SLIDER.height) return;
+        // Out the shallow way: back along the road if hit head on, sideways if clipped.
+        if (ps < pd) out.push({ id: `s${i}`, kind: "front", depth: ps, sign: Math.sign(ds) || -1, d: off });
+        else out.push({ id: `s${i}`, kind: "side", depth: pd, sign: Math.sign(dd) || 1, push: sliderVelocity(b, now), d: off });
+    });
+    hammers.forEach((hm, i) => {
+        if (Math.abs(deltaS(s, hm.s)) > HAMMER_HEAD.halfS + BODY.halfS) return;
+        const head = hammerHead(hm, now);
+        // The nearest point of the kart's cross-section to the head's centre.
+        const nd = clamp(head.d, d - BODY.halfD, d + BODY.halfD);
+        const ny = clamp(head.y, h, h + BODY.top);
+        const gap = Math.hypot(head.d - nd, head.y - ny);
+        if (gap >= HAMMER_HEAD.radius) return;
+        out.push({ id: `h${i}`, kind: "hammer", depth: HAMMER_HEAD.radius - gap, head });
+    });
+    oilSlicks.forEach((o, i) => {
+        if (h < 0.3 && Math.abs(deltaS(s, o.s)) < o.r * 0.9 && Math.abs(d - o.d) < o.r * 0.8) out.push({ id: `o${i}`, kind: "oil" });
+    });
+    return out;
+};
+
+const sparkTmp = new Object3D();
+const emitSparks = (sparks, x, y, z, count, power = 5) => {
+    for (let i = 0; i < count && sparks.length < MAX_SPARKS; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const v = power * (0.3 + Math.random() * 0.9);
+        sparks.push({
+            x,
+            y,
+            z,
+            vx: Math.cos(a) * v,
+            vy: 1.5 + Math.random() * power * 0.8,
+            vz: Math.sin(a) * v,
+            life: 0.3 + Math.random() * 0.45,
+            color: SPARK_COLORS[i % SPARK_COLORS.length],
+        });
+    }
+};
+
+const stepSparks = (sparks, dt) => {
+    let n = 0;
+    for (const sp of sparks) {
+        sp.life -= dt;
+        if (sp.life <= 0) continue;
+        sp.vy -= 14 * dt;
+        sp.x += sp.vx * dt;
+        sp.y += sp.vy * dt;
+        sp.z += sp.vz * dt;
+        sparks[n++] = sp;
+    }
+    sparks.length = n;
+};
+
+// Knocks a cone flying when a kart runs into it.
+const hitCones = (s, d, speed, heading, sample, coneState) => {
+    let hit = false;
+    cones.forEach((c, i) => {
+        const st = coneState[i];
+        if (st.hit || Math.abs(deltaS(s, c.s)) > 0.25 + BODY.halfS || Math.abs(d - c.d) > 0.25 + BODY.halfD) return;
+        st.hit = true;
+        st.t = 0;
+        const side = Math.sign(c.d - d) || 1;
+        st.vx = Math.sin(heading) * speed * 0.6 + sample.lx * side * 3;
+        st.vz = Math.cos(heading) * speed * 0.6 + sample.lz * side * 3;
+        st.vy = 6;
+        hit = true;
+    });
+    return hit;
+};
 
 // --- Things on the road ---------------------------------------------------------
+
+const makeHazardTexture = () => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#111827";
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = "#FACC15";
+    for (let i = -4; i < 8; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * 32, 0);
+        ctx.lineTo(i * 32 + 16, 0);
+        ctx.lineTo(i * 32 + 16 + 128, 128);
+        ctx.lineTo(i * 32 + 128, 128);
+        ctx.fill();
+    }
+    const tex = new CanvasTexture(c);
+    tex.colorSpace = SRGBColorSpace;
+    return tex;
+};
 
 const Hammer = ({ hammerRef, h }) => {
     const p = roadPoint(h.s);
@@ -126,11 +252,15 @@ const Hammer = ({ hammerRef, h }) => {
                 <Box args={[ROAD_HALF * 2 + 1.6, 0.4, 0.4]} position={[0, HAMMER_HEIGHT + 0.4, 0]} color="#1C1730" />
             </Shadowed>
             <group ref={hammerRef} position-y={HAMMER_HEIGHT}>
-                <Cyl args={[0.08, 0.08, HAMMER_HEIGHT - 0.9, 8]} position-y={-(HAMMER_HEIGHT - 0.9) / 2} color="#94A3B8" />
-                <group position-y={-(HAMMER_HEIGHT - 0.9)} rotation-x={Math.PI / 2}>
-                    <Cyl args={[0.75, 0.75, 1.5, 18]} color="#EF4444" castShadow />
-                    {[-0.78, 0.78].map((y) => (
-                        <Cyl key={y} args={[0.78, 0.78, 0.12, 18]} position-y={y} color="#FACC15" />
+                <Cyl args={[0.08, 0.08, HAMMER_ARM, 8]} position-y={-HAMMER_ARM / 2} color="#94A3B8" />
+                <group position-y={-HAMMER_ARM} rotation-x={Math.PI / 2}>
+                    <Cyl args={[HAMMER_HEAD.radius, HAMMER_HEAD.radius, HAMMER_HEAD.halfS * 2, 20]} castShadow>
+                        <meshStandardMaterial color="#DC2626" metalness={0.4} roughness={0.35} />
+                    </Cyl>
+                    {[-HAMMER_HEAD.halfS, HAMMER_HEAD.halfS].map((y) => (
+                        <Cyl key={y} args={[HAMMER_HEAD.radius + 0.04, HAMMER_HEAD.radius + 0.04, 0.12, 20]} position-y={y}>
+                            <meshStandardMaterial color="#CBD5E1" metalness={0.8} roughness={0.25} />
+                        </Cyl>
                     ))}
                 </group>
             </group>
@@ -138,11 +268,14 @@ const Hammer = ({ hammerRef, h }) => {
     );
 };
 
-const Slider = ({ sliderRef }) => (
+const Slider = ({ sliderRef, hazard }) => (
     <group ref={sliderRef}>
-        <Box args={[2.6, 1.4, 1.2]} position-y={0.7} color="#7C3AED" castShadow />
-        <Box args={[2.7, 0.18, 1.3]} position-y={1.45}>
-            <GlowMat color="#22D3EE" strength={2} />
+        <mesh position-y={SLIDER.height / 2} castShadow receiveShadow>
+            <boxGeometry args={[SLIDER.halfD * 2, SLIDER.height, SLIDER.halfS * 2]} />
+            <meshStandardMaterial map={hazard} roughness={0.6} />
+        </mesh>
+        <Box args={[SLIDER.halfD * 2 + 0.1, 0.16, SLIDER.halfS * 2 + 0.1]} position-y={SLIDER.height + 0.05}>
+            <GlowMat color="#22D3EE" strength={1.6} />
         </Box>
     </group>
 );
@@ -202,7 +335,8 @@ const RivalKart = ({ kartRef, color }) => (
     </group>
 );
 
-// The player's kart for one frame.
+// --- The player's kart -----------------------------------------------------------
+
 const drive = (p, dt, g, store, world) => {
     const control = !p.finished && p.stun <= 0;
     let throttle = 0;
@@ -216,8 +350,8 @@ const drive = (p, dt, g, store, world) => {
         steer = clamp(angleDiff(p.heading, Math.atan2(track[(p.idx + 20) % SAMPLES].x - p.x, track[(p.idx + 20) % SAMPLES].z - p.z)) * 2, -1, 1);
     }
     p.stun = Math.max(0, p.stun - dt);
-    p.hitCooldown = Math.max(0, p.hitCooldown - dt);
     p.boost = Math.max(0, p.boost - dt);
+    p.jolt = Math.max(0, p.jolt - dt * 2);
     if (p.stun > 0) p.heading += p.spin * dt;
 
     const nitroOn = control && (arcadeLink.holding || input.run) && p.nitro > 0 && throttle >= 0;
@@ -242,33 +376,40 @@ const drive = (p, dt, g, store, world) => {
     const grip = p.grounded ? 1 : 0.35;
     p.heading += p.steer * KART.steer * grip * clamp(p.speed / 6, -1, 1) * (p.speed > 16 ? 0.85 : 1) * dt;
 
-    p.x += Math.sin(p.heading) * p.speed * dt;
-    p.z += Math.cos(p.heading) * p.speed * dt;
-    const prevS = track[p.idx].s;
+    // Move: forward along the heading, plus any sideways shove from a hit.
+    const before = track[p.idx];
+    p.x += (Math.sin(p.heading) * p.speed + before.lx * p.lv) * dt;
+    p.z += (Math.cos(p.heading) * p.speed + before.lz * p.lv) * dt;
+    p.lv *= 1 - damp(3.5, dt);
     p.idx = nearestIndex(p.x, p.z, p.idx);
-    p.dist += deltaS(track[p.idx].s, prevS);
+    p.dist += deltaS(track[p.idx].s, before.s);
     const sample = track[p.idx];
     let d = lateral(p.x, p.z, p.idx);
     const roadY = heightAt(sample.s);
 
-    // Walls: scrape along them, or bounce off if hit square on.
+    // Walls: scrape along them in a shower of sparks, or bounce off if hit square on.
     let scraping = false;
-    const limit = ROAD_HALF - KART_RADIUS;
+    const limit = ROAD_HALF - BODY.halfD - 0.15;
     if (sample.road && Math.abs(d) > limit && p.y < roadY + 1.2) {
+        const side = Math.sign(d);
         const push = Math.abs(d) - limit;
-        p.x -= sample.lx * push * Math.sign(d);
-        p.z -= sample.lz * push * Math.sign(d);
+        p.x -= sample.lx * push * side;
+        p.z -= sample.lz * push * side;
+        if (p.lv * side > 0) p.lv = -p.lv * 0.3;
         const trackHeading = Math.atan2(sample.tx, sample.tz) + (p.speed < 0 ? Math.PI : 0);
         const into = Math.abs(Math.sin(angleDiff(trackHeading, p.heading))) * Math.abs(p.speed);
-        if (into > 7 && p.hitCooldown === 0) {
+        if (into > 7 && !p.touching.has("wall")) {
             playSound("crash");
             p.shake = 0.35;
-            p.hitCooldown = 0.5;
+            p.jolt = 0.4;
             p.speed *= 0.6;
+            emitSparks(world.sparks, p.x + sample.lx * side * 0.6, p.y + 0.4, p.z + sample.lz * side * 0.6, 14);
         }
         p.heading += angleDiff(p.heading, trackHeading) * 0.15;
         p.speed *= 1 - 0.8 * dt;
-        d = Math.sign(d) * limit;
+        if (Math.abs(p.speed) > 7 && Math.random() < 0.6)
+            emitSparks(world.sparks, p.x + sample.lx * side * 0.6, p.y + 0.3, p.z + sample.lz * side * 0.6, 1, 3);
+        d = side * limit;
         scraping = true;
     }
 
@@ -290,6 +431,7 @@ const drive = (p, dt, g, store, world) => {
             if (p.vy < -5) {
                 playSound("land");
                 p.shake = Math.min(0.5, -p.vy * 0.04);
+                p.jolt = Math.min(0.6, -p.vy * 0.04);
                 p.speed *= 0.93;
             }
             p.y = roadY;
@@ -301,15 +443,15 @@ const drive = (p, dt, g, store, world) => {
             const back = roadPoint(track[p.lastSafe].s);
             playSound("fall");
             store.say("race.fell", null, "#EF4444");
-            Object.assign(p, { x: back.x, y: back.y, z: back.z, heading: back.heading, speed: 0, vy: 0, grounded: true, idx: p.lastSafe });
+            Object.assign(p, { x: back.x, y: back.y, z: back.z, heading: back.heading, speed: 0, lv: 0, vy: 0, grounded: true, idx: p.lastSafe });
             p.dist += deltaS(track[p.lastSafe].s, sample.s);
         }
     }
     if (p.grounded && sample.road && !(sample.s > LIP_S - 25 && sample.s < GAP_END_S)) p.lastSafe = p.idx;
 
-    // Things on the road (only when down on it).
+    // Pick-ups only count down on the road.
+    const s = sample.s;
     if (p.grounded) {
-        const s = sample.s;
         boostPads.forEach((b) => {
             if (Math.abs(deltaS(s, b.s)) < 1.3 && Math.abs(d - b.d) < 1.6) {
                 if (p.boost < 0.6) playSound("boost");
@@ -324,77 +466,97 @@ const drive = (p, dt, g, store, world) => {
                 playSound("pickup");
             }
         });
-        cones.forEach((c, i) => {
-            const st = world.cones[i];
-            if (!st.hit && Math.abs(deltaS(s, c.s)) < 0.9 && Math.abs(d - c.d) < 0.9) {
-                st.hit = true;
-                st.t = 0;
-                const side = Math.sign(c.d - d) || 1;
-                st.vx = Math.sin(p.heading) * p.speed * 0.6 + sample.lx * side * 3;
-                st.vz = Math.cos(p.heading) * p.speed * 0.6 + sample.lz * side * 3;
-                st.vy = 6;
-                p.speed *= 0.88;
-                playSound("cone");
-            }
-        });
-        if (p.hitCooldown === 0) {
-            for (const o of oilSlicks) {
-                if (Math.abs(deltaS(s, o.s)) < o.r * 0.9 && Math.abs(d - o.d) < o.r * 0.8 && Math.abs(p.speed) > 6) {
-                    p.stun = 0.9;
-                    p.spin = (Math.random() < 0.5 ? -1 : 1) * 9;
-                    p.speed *= 0.6;
-                    p.hitCooldown = 1.2;
-                    playSound("splash");
-                    store.say("race.spin", null, "#94A3B8");
-                }
-            }
-            for (const b of sliders) {
-                const off = sliderOffset(b, g.now);
-                if (Math.abs(deltaS(s, b.s)) < 0.6 + KART_RADIUS && Math.abs(d - off) < 1.3 + KART_RADIUS) {
-                    p.speed = -4;
-                    p.stun = 0.5;
-                    p.spin = 0;
-                    p.hitCooldown = 0.8;
-                    p.shake = 0.45;
+        if (hitCones(s, d, p.speed, p.heading, sample, world.cones)) {
+            p.speed *= 0.88;
+            playSound("cone");
+        }
+    }
+
+    // Obstacles are solid at their real size and height, airborne or not.
+    const touching = new Set(scraping ? ["wall"] : []);
+    for (const c of contactsAt(s, d, p.y - roadY, g.now)) {
+        const fresh = !p.touching.has(c.id);
+        touching.add(c.id);
+        if (c.kind === "front") {
+            // Stopped by the block: back out of it, bouncing off if it was a real hit.
+            p.x += sample.tx * c.depth * c.sign;
+            p.z += sample.tz * c.depth * c.sign;
+            const into = -c.sign * p.speed;
+            if (into > 0) {
+                if (fresh && into > 5) {
+                    p.stun = 0.45;
+                    p.spin = (Math.random() - 0.5) * 4;
+                    p.shake = 0.55;
+                    p.jolt = 0.6;
                     playSound("crash");
+                    const at = roadPoint(s + c.sign * -0.8, d);
+                    emitSparks(world.sparks, at.x, at.y + 0.6, at.z, 22, 6);
                 }
+                p.speed = -into * 0.3;
             }
-            for (const h of hammers) {
-                const a = hammerAngle(h, g.now);
-                if (Math.abs(a) < 0.65 && Math.abs(deltaS(s, h.s)) < 0.75 + KART_RADIUS && Math.abs(d - hammerOffset(h, g.now)) < 1.6) {
-                    const swing = Math.cos(g.now * h.speed + h.phase);
-                    p.x += sample.lx * Math.sign(swing) * 1.6;
-                    p.z += sample.lz * Math.sign(swing) * 1.6;
-                    p.speed = -3;
-                    p.stun = 0.8;
-                    p.spin = Math.sign(swing) * 5;
-                    p.hitCooldown = 1;
-                    p.shake = 0.6;
-                    playSound("crash");
+        } else if (c.kind === "side") {
+            // Clipped its side, or it slid into us: pushed out, and along with it.
+            p.x += sample.lx * c.depth * c.sign;
+            p.z += sample.lz * c.depth * c.sign;
+            if (Math.sign(c.push) === c.sign) p.lv = c.push;
+            if (fresh) {
+                p.speed *= 0.85;
+                p.jolt = 0.35;
+                playSound("bump");
+                const at = roadPoint(s, d - c.sign * BODY.halfD);
+                emitSparks(world.sparks, at.x, at.y + 0.5, at.z, 10, 4);
+            }
+        } else if (c.kind === "hammer") {
+            // Out of the head's way, and, if it was swinging into us, sent flying.
+            const away = Math.sign(d - c.head.d) || c.head.dir;
+            p.x += sample.lx * (c.depth + 0.05) * away;
+            p.z += sample.lz * (c.depth + 0.05) * away;
+            if (fresh) {
+                const swatted = away === c.head.dir;
+                p.lv = away * (swatted ? 11 : 5);
+                p.speed *= swatted ? 0.3 : 0.6;
+                if (swatted) {
+                    p.vy = 5.5;
+                    p.grounded = false;
                     store.say("race.bonk", null, "#EF4444");
                 }
+                p.stun = swatted ? 0.75 : 0.35;
+                p.spin = away * (swatted ? 7 : 3);
+                p.shake = swatted ? 0.8 : 0.4;
+                p.jolt = 0.8;
+                playSound("crash");
+                const at = roadPoint(s, c.head.d);
+                emitSparks(world.sparks, at.x, at.y + c.head.y, at.z, swatted ? 30 : 14, 7);
             }
+        } else if (c.kind === "oil" && fresh && Math.abs(p.speed) > 6) {
+            p.stun = 0.9;
+            p.spin = (Math.random() < 0.5 ? -1 : 1) * 9;
+            p.speed *= 0.6;
+            playSound("splash");
+            store.say("race.spin", null, "#94A3B8");
         }
     }
 
     // Bumping into rivals.
-    world.rivals.forEach((rv) => {
+    world.rivals.forEach((rv, k) => {
         const pt = roadPoint(rv.dist, rv.d);
         const dx = p.x - pt.x;
         const dz = p.z - pt.z;
         const dist = Math.hypot(dx, dz);
-        if (dist < KART_RADIUS * 2 && Math.abs(p.y - pt.y) < 1) {
-            const push = KART_RADIUS * 2 - dist;
-            p.x += (dx / (dist || 1)) * push;
-            p.z += (dz / (dist || 1)) * push;
-            rv.d -= Math.sign(lateral(p.x, p.z, p.idx) - rv.d) * push * 0.5;
-            if (p.hitCooldown === 0) {
+        if (dist < BODY.halfS * 2 && Math.abs(p.y - pt.y - rv.hop) < 1) {
+            const push = BODY.halfS * 2 - dist;
+            p.x += (dx / (dist || 1)) * push * 0.6;
+            p.z += (dz / (dist || 1)) * push * 0.6;
+            rv.d -= Math.sign(lateral(p.x, p.z, p.idx) - rv.d) * push * 0.4;
+            if (!p.touching.has(`r${k}`)) {
                 p.speed *= 0.92;
-                p.hitCooldown = 0.3;
+                p.jolt = 0.3;
                 playSound("bump");
             }
+            touching.add(`r${k}`);
         }
     });
+    p.touching = touching;
 
     p.wheel += (p.speed * dt) / 0.2;
     // Engine note rises with speed; tyres squeal in hard corners and on walls.
@@ -405,13 +567,106 @@ const drive = (p, dt, g, store, world) => {
     screechLoop.set(squeal, 2400 + Math.random() * 400);
 };
 
+// --- Rivals ------------------------------------------------------------------
+
+// Picks a lane clear of whatever will be in the way by the time the rival gets there.
+const chooseLane = (rv, now) => {
+    let lane = rv.lane;
+    for (const o of [...cones, ...oilSlicks]) {
+        const ahead = deltaS(o.s, rv.dist);
+        if (ahead > 0 && ahead < 16 && Math.abs(o.d - lane) < 1.9) lane = o.d > 0 ? o.d - 2.4 : o.d + 2.4;
+    }
+    for (const b of sliders) {
+        const ahead = deltaS(b.s, rv.dist);
+        if (ahead <= 0 || ahead > 22) continue;
+        const off = sliderOffset(b, now + ahead / Math.max(rv.speed, 4));
+        if (Math.abs(off - lane) < SLIDER.halfD + 1.3) lane = off > 0 ? off - SLIDER.halfD - 1.4 : off + SLIDER.halfD + 1.4;
+    }
+    for (const h of hammers) {
+        const ahead = deltaS(h.s, rv.dist);
+        if (ahead <= 0 || ahead > 24) continue;
+        const head = hammerHead(h, now + ahead / Math.max(rv.speed, 4));
+        // Low and sweeping when we arrive: get to the side it's leaving.
+        if (head.y < BODY.top + HAMMER_HEAD.radius) lane = -head.dir * (ROAD_HALF - 1.1);
+    }
+    return clamp(lane, -ROAD_HALF + 1, ROAD_HALF - 1);
+};
+
+const driveRival = (rv, p, g, dt, world, near) => {
+    const i = indexAt(rv.dist);
+    rv.stun = Math.max(0, rv.stun - dt);
+    const lead = rv.dist - p.dist;
+    // Keep the pack close: rivals ease off when far ahead, push when behind.
+    const rubber = clamp(1 - lead / 260, 0.86, 1.14);
+    const target = rv.stun > 0 ? 0 : Math.min(KART.max * rv.skill * rubber, cornerSpeed[i]);
+    if (rv.stun === 0 && boostPads.some((b) => Math.abs(deltaS(rv.dist, b.s)) < 1.5)) rv.speed = Math.max(rv.speed, 24);
+    rv.speed += clamp(target - rv.speed, -KART.brake * dt, KART.accel * 0.8 * dt);
+    rv.dist += rv.speed * dt;
+    rv.d += clamp(chooseLane(rv, g.now) - rv.d, -3 * dt, 3 * dt) + rv.lv * dt;
+    rv.lv *= 1 - damp(3.5, dt);
+    rv.d = clamp(rv.d, -ROAD_HALF + BODY.halfD + 0.15, ROAD_HALF - BODY.halfD - 0.15);
+    rv.hopV -= KART.gravity * dt;
+    rv.hop = Math.max(0, rv.hop + rv.hopV * dt);
+    if (rv.hop === 0) rv.hopV = 0;
+    rv.spin += rv.spinV * dt;
+    rv.spinV *= 1 - damp(2.5, dt);
+    if (rv.stun === 0) rv.spin += angleDiff(rv.spin, 0) * damp(4, dt);
+
+    // The same obstacles hit rivals that miss their dodge.
+    const s = wrap(rv.dist);
+    const sample = track[i];
+    if (hitCones(s, rv.d, rv.speed, Math.atan2(sample.tx, sample.tz), sample, world.cones)) {
+        rv.speed *= 0.9;
+        if (near) playSound("cone");
+    }
+    const touching = new Set();
+    for (const c of contactsAt(s, rv.d, rv.hop, g.now)) {
+        const fresh = !rv.touching.has(c.id);
+        touching.add(c.id);
+        const at = roadPoint(s, rv.d);
+        if (c.kind === "front") {
+            rv.dist += c.depth * c.sign;
+            if (fresh && rv.speed > 5) {
+                rv.stun = 0.6;
+                rv.spinV = (Math.random() - 0.5) * 6;
+                emitSparks(world.sparks, at.x, at.y + 0.6, at.z, 16, 5);
+                if (near) playSound("crash");
+            }
+            rv.speed = Math.min(rv.speed, 0) - 1;
+        } else if (c.kind === "side") {
+            rv.d += c.depth * c.sign;
+            if (Math.sign(c.push) === c.sign) rv.lv = c.push;
+        } else if (c.kind === "hammer") {
+            const away = Math.sign(rv.d - c.head.d) || c.head.dir;
+            rv.d += (c.depth + 0.05) * away;
+            if (fresh) {
+                rv.lv = away * 10;
+                rv.speed *= 0.3;
+                rv.hopV = 5.5;
+                rv.stun = 0.9;
+                rv.spinV = away * 9;
+                emitSparks(world.sparks, at.x, at.y + c.head.y, at.z, 24, 7);
+                if (near) playSound("crash");
+            }
+        } else if (c.kind === "oil" && fresh && rv.speed > 6) {
+            rv.stun = 0.8;
+            rv.spinV = (Math.random() < 0.5 ? -1 : 1) * 10;
+            rv.speed *= 0.6;
+        }
+    }
+    rv.touching = touching;
+    if (rv.dist >= LAPS * TRACK_LENGTH && rv.finishedAt === null) rv.finishedAt = g.time;
+};
+
 // --- The race -----------------------------------------------------------------
 
 export const Race = () => {
     const active = useArcade((s) => s.active === "race");
     const run = useArcade((s) => s.run);
+    const hazard = useMemo(() => makeHazardTexture(), []);
     const player = useRef(newPlayer());
     const rivals = useRef(RIVALS.map(newRival));
+    const sparks = useRef([]);
     const game = useRef(null);
     const refs = useRef({ hammers: [], sliders: [], cones: [], cans: [], rivals: [] });
     const coneState = useRef(cones.map(() => ({ hit: false, t: 0, vx: 0, vz: 0, vy: 0 })));
@@ -420,6 +675,7 @@ export const Race = () => {
     useEffect(() => {
         player.current = newPlayer();
         rivals.current = RIVALS.map(newRival);
+        sparks.current = [];
         coneState.current = cones.map(() => ({ hit: false, t: 0, vx: 0, vz: 0, vy: 0 }));
         canState.current = nitroCans.map(() => ({ taken: 0 }));
         if (!active) {
@@ -430,7 +686,7 @@ export const Race = () => {
         }
         const p = player.current;
         arcadeLink.teleport = { x: p.x, z: p.z, rotY: p.heading };
-        game.current = { count: COUNTDOWN, time: 0, published: -1, place: 3, lap: 0, done: false };
+        game.current = { count: COUNTDOWN, time: 0, published: -1, place: 3, lap: 0, done: false, now: 0 };
         playSound("beep");
         useArcade.getState().update({ detail: { lap: 1, laps: LAPS, place: 3, racers: 4 } });
     }, [active, run]);
@@ -480,47 +736,41 @@ export const Race = () => {
         const g = game.current;
         const p = player.current;
         const store = useArcade.getState();
+        const world = { rivals: rivals.current, cones: coneState.current, cans: canState.current, sparks: sparks.current };
+        if (g) g.now = t;
 
         // Rivals sit on the grid until the lights go out.
         const racing = g && store.status !== "countdown";
         rivals.current.forEach((rv, k) => {
-            if (racing) {
-                const i = indexAt(rv.dist);
-                const lead = rv.dist - p.dist;
-                // Keep the pack close: rivals ease off when far ahead, push when behind.
-                const rubber = clamp(1 - lead / 260, 0.86, 1.14);
-                let target = Math.min(KART.max * rv.skill * rubber, cornerSpeed[i]);
-                if (boostPads.some((b) => Math.abs(deltaS(rv.dist, b.s)) < 1.5)) rv.speed = Math.max(rv.speed, 24);
-                rv.speed += clamp(target - rv.speed, -KART.brake * dt, KART.accel * 0.8 * dt);
-                rv.dist += rv.speed * dt;
-                // Steer round the cones and oil a little way ahead.
-                let lane = rv.lane;
-                for (const o of [...cones, ...oilSlicks]) {
-                    const ahead = deltaS(o.s, rv.dist);
-                    if (ahead > 0 && ahead < 16 && Math.abs(o.d - rv.d) < 1.9) lane = o.d > 0 ? o.d - 2.4 : o.d + 2.4;
-                }
-                rv.d += clamp(clamp(lane, -ROAD_HALF + 1, ROAD_HALF - 1) - rv.d, -2 * dt, 2 * dt);
-                rv.wheel += (rv.speed * dt) / 0.2;
-                if (rv.dist >= LAPS * TRACK_LENGTH && rv.finishedAt === null) rv.finishedAt = g.time;
-            }
+            if (racing) driveRival(rv, p, g, dt, world, Math.abs(rv.dist - p.dist) < 30);
             const el = r.rivals[k];
             if (!el) return;
-            const s = rv.dist;
-            const pt = roadPoint(s, rv.d);
+            const pt = roadPoint(rv.dist, rv.d);
             let y = pt.y;
-            const sMod = ((s % TRACK_LENGTH) + TRACK_LENGTH) % TRACK_LENGTH;
+            const sMod = wrap(rv.dist);
             // Rivals always clear the gap, with a hop.
             if (sMod > LIP_S && sMod < GAP_END_S) {
                 const f = (sMod - LIP_S) / (GAP_END_S - LIP_S);
                 y = heightAt(LIP_S) * (1 - f) + heightAt(GAP_END_S) * f + Math.sin(f * Math.PI) * 2.4;
             }
-            el.position.set(pt.x, y, pt.z);
-            el.rotation.y = pt.heading;
+            el.position.set(pt.x, y + rv.hop, pt.z);
+            el.rotation.y = pt.heading + rv.spin;
         });
 
+        // Sparks fly and fade (compacted in place: this frame's hits add to the same list).
+        stepSparks(sparks.current, dt);
+        sparks.current.forEach((sp, i) => {
+            sparkTmp.position.set(sp.x, sp.y, sp.z);
+            sparkTmp.scale.setScalar(Math.max(0.02, sp.life * 0.14));
+            sparkTmp.updateMatrix();
+            r.sparks.setMatrixAt(i, sparkTmp.matrix);
+            r.sparks.setColorAt(i, sp.color);
+        });
+        r.sparks.count = sparks.current.length;
+        r.sparks.instanceMatrix.needsUpdate = true;
+        if (r.sparks.instanceColor) r.sparks.instanceColor.needsUpdate = true;
+
         if (!g) return;
-        // Moving obstacles' collisions use the same clock as their animation.
-        g.now = t;
 
         if (store.status === "countdown") {
             // Rev the engine on the grid.
@@ -530,7 +780,7 @@ export const Race = () => {
             tickCountdown(g, dt);
         } else {
             g.time += dt;
-            drive(p, dt, g, store, { rivals: rivals.current, cones: coneState.current, cans: canState.current });
+            drive(p, dt, g, store, world);
         }
 
         // Lap, place and the HUD.
@@ -568,9 +818,18 @@ export const Race = () => {
             ],
         };
 
-        // Show the player in the kart, and chase it with the camera.
+        // Show the player in the kart, and chase it with the camera. Hits
+        // jolt the kart; sideways shoves lean it over.
         const roadPitch = p.grounded ? Math.atan2(heightAt(track[p.idx].s + 1) - heightAt(track[p.idx].s - 1), 2) : clamp(p.vy * 0.04, -0.4, 0.4);
-        arcadeLink.lock = { x: p.x, y: p.y, z: p.z, rotY: p.heading, pitch: -roadPitch, roll: -p.steer * clamp(p.speed / 20, 0, 1) * 0.12 };
+        const jolt = Math.sin(t * 40) * p.jolt * 0.12;
+        arcadeLink.lock = {
+            x: p.x,
+            y: p.y,
+            z: p.z,
+            rotY: p.heading,
+            pitch: -roadPitch + jolt,
+            roll: -p.steer * clamp(p.speed / 20, 0, 1) * 0.12 - clamp(p.lv * 0.03, -0.3, 0.3) + jolt,
+        };
         arcadeLink.kart = { speed: p.speed, steer: p.steer, wheel: p.wheel };
         arcadeLink.focus = { x: p.x, z: p.z };
         const dx = Math.sin(p.heading);
@@ -594,7 +853,7 @@ export const Race = () => {
                 <Hammer key={i} h={h} hammerRef={(el) => (r.hammers[i] = el)} />
             ))}
             {sliders.map((_, i) => (
-                <Slider key={i} sliderRef={(el) => (r.sliders[i] = el)} />
+                <Slider key={i} hazard={hazard} sliderRef={(el) => (r.sliders[i] = el)} />
             ))}
             {cones.map((_, i) => (
                 <Cone key={i} coneRef={(el) => (r.cones[i] = el)} />
@@ -611,6 +870,18 @@ export const Race = () => {
             {RIVALS.map((rv, i) => (
                 <RivalKart key={i} color={rv.color} kartRef={(el) => (r.rivals[i] = el)} />
             ))}
+            <instancedMesh
+                ref={(el) => {
+                    r.sparks = el;
+                    if (el) el.count = 0;
+                }}
+                args={[undefined, undefined, MAX_SPARKS]}
+                frustumCulled={false}
+            >
+                <boxGeometry args={[1, 1, 1]} />
+                <meshBasicMaterial toneMapped={false} />
+                <InstanceColors count={MAX_SPARKS} />
+            </instancedMesh>
         </group>
     );
 };

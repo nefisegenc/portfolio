@@ -37,7 +37,7 @@ export const GAP_LENGTH = 15;
 const curve = new CatmullRomCurve3(
     POINTS.map(([x, y, z]) => new Vector3(x + CIRCUIT.x, y + CIRCUIT.y, z + CIRCUIT.z)),
     true,
-    "centripetal",
+    "centripetal"
 );
 export const TRACK_LENGTH = curve.getLength();
 export const SAMPLES = 1000;
@@ -170,19 +170,28 @@ export const oilSlicks = [
     { s: at(14, 6), d: 1.6, r: 1.5 },
 ];
 
-// Blocks that slide from side to side across the climb.
+// Blocks that slide from side to side across the climb. Sizes are halves
+// along the road (s) and across it (d), shared by the model and collisions.
+export const SLIDER = { halfS: 0.6, halfD: 1.3, height: 1.4 };
 export const sliders = [
     { s: at(4, 7), amp: 2.9, speed: 1.5, phase: 0 },
     { s: at(5, 3), amp: 2.9, speed: 1.9, phase: 1.7 },
 ];
 export const sliderOffset = (b, t) => Math.sin(t * b.speed + b.phase) * b.amp;
+export const sliderVelocity = (b, t) => Math.cos(t * b.speed + b.phase) * b.amp * b.speed;
 
-// Pendulum hammers that swing across the downhill run.
+// Pendulum hammers that swing across the downhill run. The head is a drum
+// lying along the road at the end of the arm.
 export const hammers = [
     { s: at(9, -2), speed: 2.1, phase: 0 },
     { s: at(10, -6), speed: 2.4, phase: 2.2 },
 ];
 export const HAMMER_HEIGHT = 5.2;
+export const HAMMER_ARM = HAMMER_HEIGHT - 0.9;
+export const HAMMER_HEAD = { radius: 0.75, halfS: 0.75 };
 export const hammerAngle = (h, t) => Math.sin(t * h.speed + h.phase) * 1.0;
-// Where the hammer's head is across the road.
-export const hammerOffset = (h, t) => Math.sin(hammerAngle(h, t)) * (HAMMER_HEIGHT - 0.9);
+// The head's centre across the road and above it, and which way it is swinging.
+export const hammerHead = (h, t) => {
+    const a = hammerAngle(h, t);
+    return { d: Math.sin(a) * HAMMER_ARM, y: HAMMER_HEIGHT - Math.cos(a) * HAMMER_ARM, dir: Math.sign(Math.cos(t * h.speed + h.phase)) || 1 };
+};

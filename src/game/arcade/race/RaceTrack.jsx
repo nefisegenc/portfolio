@@ -234,7 +234,7 @@ const Gantry = () => {
                         <planeGeometry args={[(ROAD_HALF * 2) / 16, 0.52]} />
                         <meshBasicMaterial color={(i + r) % 2 ? "#F8FAFC" : "#111827"} />
                     </mesh>
-                )),
+                ))
             )}
         </group>
     );
