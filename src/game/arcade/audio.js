@@ -381,6 +381,11 @@ addEffects({
         noiseBurst({ duration: 0.5, freq: 400, to: 4000, q: 0.8, volume: 0.25 });
         tone({ freq: 110, to: 40, type: "sawtooth", decay: 0.4, volume: 0.12, filter: 900 });
     },
+    // A turbo shot glancing off the cage.
+    zing: () => {
+        tone({ freq: 1800, to: 700, type: "square", decay: 0.18, volume: 0.05, filter: 4000 });
+        noiseBurst({ duration: 0.12, freq: 3000, q: 1.5, volume: 0.12 });
+    },
     knock: () => {
         tone({ freq: 160, to: 60, type: "square", decay: 0.25, volume: 0.1, filter: 1200 });
         noiseBurst({ duration: 0.2, freq: 500, q: 0.7, volume: 0.2 });

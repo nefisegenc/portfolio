@@ -35,7 +35,7 @@ export const ROOF_RISE = 0.4;
 const BAR_R = 0.07;
 // The pitch is a neon cage: the ball bounces off the ceiling and the walls
 // above the goals straight back into play.
-export const CEILING = 7.6;
+export const CEILING = 6.6;
 export const GOAL_WIDTH = 3.4;
 
 export const BALL_R = 0.3;
@@ -52,8 +52,8 @@ const MATCH_TIME = 90;
 const GOLDEN_TIME = 30;
 const START_X = 4.2;
 // After a goal: a moment in slow motion, then the celebration.
-const PAUSE = 2.6;
-const SLOW_MO = 0.8;
+const PAUSE = 2.2;
+const SLOW_MO = 0.6;
 
 // Frontend in purple, Backend in terminal green.
 export const TEAMS = ["#C084FC", "#4ADE80"];
@@ -67,16 +67,17 @@ const AIR_ACCEL = 26;
 const JUMP = 9.2;
 const GRAVITY = 26;
 
-// A lively ball: bouncy off the grass, the walls and the ceiling.
-const BALL_GRAVITY = 15;
-const AIR_DRAG = 0.08;
-const ROLL_FRICTION = 0.9;
-const GROUND_BOUNCE = 0.72;
-const WALL_BOUNCE = 0.85;
-const CEILING_BOUNCE = 0.85;
+// A lively, floaty ball: bouncy off the grass, and off the walls and the
+// ceiling it hardly slows at all.
+const BALL_GRAVITY = 12;
+const AIR_DRAG = 0.05;
+const ROLL_FRICTION = 0.7;
+const GROUND_BOUNCE = 0.8;
+const WALL_BOUNCE = 0.95;
+const CEILING_BOUNCE = 0.95;
 const NET_BOUNCE = 0.25;
-const ROOF_BOUNCE = 0.7;
-const MAX_BALL = 25;
+const ROOF_BOUNCE = 0.8;
+const MAX_BALL = 32;
 
 // A kick swings the boot through the space in front of the player.
 export const KICK_TIME = 0.28;
@@ -90,10 +91,14 @@ const KICK_REACH = 0.45;
 // How far out the boot meets a ball `front` metres ahead, 0 (tucked in)
 // to 1 (full stretch).
 const reachOf = (front) => (front - 0.45) / 0.7;
-// A full force meter turns the next kick into a flat, fast shot that
-// bowls over whoever it hits ("git push --force").
-const FORCE_SPEED = 19;
-const FORCE_TIME = 0.9;
+// A full turbo meter turns the next kick or header into a turbo shot ("git
+// push --force"): a blazing, near-straight shot that bounces off the first
+// thing it hits at full pace and bowls over anyone in its way. Only a kick
+// timed right can turn it back.
+const TURBO_SPEED = 27;
+const TURBO_TIME = 1.1;
+// Overclock (a power-up) puts extra pace on every kick and header.
+const OVERCLOCK_KICK = 1.4;
 
 const SUBSTEPS = 4;
 const IDLE = { move: 0, jump: false, kick: false };
@@ -115,6 +120,7 @@ const newPlayer = (side) => ({
     stun: 0,
     frozen: 0,
     coffee: 0,
+    overclock: 0,
     // When it last touched the ball, so a ball resting on a head doesn't
     // fill the force meter (or rattle) every frame.
     touch: -1,
@@ -141,8 +147,10 @@ export const newGame = () => ({
     // Firewall seconds left in front of each goal.
     walls: [0, 0],
     item: null,
-    nextItem: 12,
+    nextItem: 8,
     shake: 0,
+    // Where the last turbo shot went off, for its shockwave.
+    shock: { x: 0, y: 0, time: 0, color: TEAMS[0] },
     cheer: { side: 0, time: 0 },
     ai: { target: START_X, jumpCool: 0, jitter: 0, jitterTime: 0, sprint: false, idle: 0 },
     clock: 0,
@@ -313,21 +321,46 @@ const bodyPoint = (b, p) => Math.max(p.y + BODY_LOW, Math.min(p.y + BODY_HIGH, b
 const overlaps = (b, p) =>
     Math.hypot(b.x - p.x, b.y - p.y - HEAD_Y) < HEAD_R + BALL_R || Math.hypot(b.x - p.x, b.y - bodyPoint(b, p)) < BODY_R + BALL_R;
 
+// Fills the turbo meter (twice as fast while overclocked).
+const charge = (p, amount) => {
+    p.force = Math.min(1, p.force + amount * (p.overclock > 0 ? 2 : 1));
+};
+
 const touched = (g, p, sound, gain) => {
     g.ball.last = p;
     if (g.clock - p.touch > 0.15) {
         playSound(sound);
-        p.force = Math.min(1, p.force + gain);
+        charge(p, gain);
         if (sound === "header") p.squash = 0.16;
     }
     p.touch = g.clock;
+};
+
+// Fires the ball off as a turbo shot in the direction (dx, dy).
+const turbo = (g, p, ctx, dx, dy) => {
+    const b = g.ball;
+    const len = Math.hypot(dx, dy) || 1;
+    b.vx = (dx / len) * TURBO_SPEED;
+    b.vy = (dy / len) * TURBO_SPEED;
+    b.force = TURBO_TIME;
+    b.by = p;
+    b.last = p;
+    p.force = 0;
+    p.touch = g.clock;
+    const color = TEAMS[p.side < 0 ? 0 : 1];
+    g.shake = Math.max(g.shake, 0.5);
+    Object.assign(g.shock, { x: b.x, y: b.y, time: 0.45, color });
+    playSound("forceShot");
+    burst(ctx.fx, b.x, b.y, color, 22, 8, { life: 0.5 });
+    burst(ctx.fx, b.x, b.y, "#FDE047", 14, 7, { life: 0.4 });
+    ctx.store.say("head.force", null, color);
 };
 
 // A kick off the grass, `reach` from 0 (ball tucked in close: a chip) to
 // 1 (met at full stretch: a drive): [forward speed, upward speed].
 const groundKick = (reach) => {
     const r = Math.max(0, Math.min(1, reach));
-    return [7.5 + r * 5, 9.5 - r * 4.5];
+    return [8 + r * 6, 11 - r * 5];
 };
 
 const kickBall = (g, p, ctx) => {
@@ -335,35 +368,29 @@ const kickBall = (g, p, ctx) => {
     const f = p.facing;
     const height = b.y - p.y;
     if (p.force >= 1) {
-        b.vx = f * FORCE_SPEED;
-        b.vy = height > 1 ? 0.2 : 1;
-        b.force = FORCE_TIME;
-        b.by = p;
-        p.force = 0;
-        g.shake = Math.max(g.shake, 0.3);
-        playSound("forceShot");
-        burst(ctx.fx, b.x, b.y, TEAMS[p.side < 0 ? 0 : 1], 18, 6, { life: 0.5 });
-        ctx.store.say("head.force", null, TEAMS[p.side < 0 ? 0 : 1]);
-    } else {
-        if (height < 0.7 && p.y < 0.05) {
-            // Off the grass, where the foot meets the ball sets the shot: a
-            // ball tucked in close is chipped up and over, one met at full
-            // stretch is driven low and hard.
-            const [vx, vy] = groundKick(reachOf((b.x - p.x) * f));
-            b.vx = f * vx + p.vx * 0.35;
-            b.vy = vy;
-        } else {
-            // A volley: flatter and harder.
-            b.vx = f * 12 + p.vx * 0.3;
-            b.vy = 3.4;
-        }
-        b.force = 0;
-        p.force = Math.min(1, p.force + 0.09);
-        playSound("kickBall");
-        burst(ctx.fx, b.x, b.y, "#E2E8F0", 6, 2.5, { life: 0.35, size: 0.08 });
+        // Low and flat, rising a touch off the grass.
+        turbo(g, p, ctx, f, height > 1 ? 0 : 0.08);
+        return;
     }
+    const boost = p.overclock > 0 ? OVERCLOCK_KICK : 1;
+    if (height < 0.7 && p.y < 0.05) {
+        // Off the grass, where the foot meets the ball sets the shot: a
+        // ball tucked in close is chipped up and over, one met at full
+        // stretch is driven low and hard.
+        const [vx, vy] = groundKick(reachOf((b.x - p.x) * f));
+        b.vx = (f * vx + p.vx * 0.35) * boost;
+        b.vy = vy * boost;
+    } else {
+        // A volley: flatter and harder.
+        b.vx = (f * 14 + p.vx * 0.3) * boost;
+        b.vy = 4.5 * boost;
+    }
+    b.force = 0;
     b.last = p;
     p.touch = g.clock;
+    charge(p, 0.07);
+    playSound("kickBall");
+    burst(ctx.fx, b.x, b.y, p.overclock > 0 ? ITEM_COLORS.overclock : "#E2E8F0", 6, 2.5, { life: 0.35, size: 0.08 });
 };
 
 // The ball against one player: their kick, a force shot bowling them over,
@@ -380,35 +407,45 @@ const touchBall = (g, p, ctx) => {
         }
     }
     if (b.force > 0 && b.by !== p && overlaps(b, p)) {
-        // Knocked flat and sent flying back, while the ball pops up off them
-        // for whoever follows it in.
-        p.stun = 0.9;
-        p.vx = b.vx > 0 ? 6 : -6;
-        p.vy = 4;
+        // Bowled over and sent flying, while the shot ploughs on through.
+        p.stun = 1.1;
+        p.vx = b.vx > 0 ? 10 : -10;
+        p.vy = 6;
         p.kick = 0;
-        b.vx *= -0.25;
-        b.vy = 5;
-        b.force = 0;
+        b.vx *= 0.8;
+        b.vy *= 0.8;
         b.ghost = p;
-        b.ghostTime = 0.12;
-        g.shake = Math.max(g.shake, 0.45);
+        b.ghostTime = 0.3;
+        g.shake = Math.max(g.shake, 0.6);
         playSound("knock");
-        burst(ctx.fx, b.x, b.y, "#FDE047", 14, 5, { life: 0.45 });
+        burst(ctx.fx, b.x, b.y, "#FDE047", 18, 6, { life: 0.5 });
         return;
     }
     // Only part of the player's own speed goes into the ball, so a jumping
     // header doesn't send it into orbit.
-    if (bounceOff(b, p.x, p.y + HEAD_Y, HEAD_R, p.vx * 0.6, p.vy * 0.6, 0.65, 4.2)) {
-        // Headers go the way the player faces.
-        b.vx += p.facing * 1.3;
-        touched(g, p, "header", 0.06);
+    if (bounceOff(b, p.x, p.y + HEAD_Y, HEAD_R, p.vx * 0.6, p.vy * 0.6, 0.8, 5)) {
+        // Headers go the way the player faces, and up: the ball loves the
+        // ceiling.
+        b.vx += p.facing * 1.6;
+        b.vy += 2.2;
+        if (p.force >= 1) {
+            turbo(g, p, ctx, b.vx + p.facing * 6, b.vy);
+            p.squash = 0.16;
+            return;
+        }
+        if (p.overclock > 0) {
+            b.vx *= OVERCLOCK_KICK;
+            b.vy *= OVERCLOCK_KICK;
+        }
+        touched(g, p, "header", 0.05);
     }
     if (bounceOff(b, p.x, bodyPoint(b, p), BODY_R, p.vx, p.vy * 0.6, 0.3, 1.2)) touched(g, p, "bump", 0.02);
 };
 
 const moveBall = (b, h) => {
-    b.vy -= (b.force > 0 ? BALL_GRAVITY * 0.12 : BALL_GRAVITY) * h;
-    const drag = 1 - AIR_DRAG * h;
+    // A turbo shot flies almost dead straight.
+    b.vy -= (b.force > 0 ? BALL_GRAVITY * 0.08 : BALL_GRAVITY) * h;
+    const drag = b.force > 0 ? 1 : 1 - AIR_DRAG * h;
     b.vx *= drag;
     b.vy *= drag;
     const speed = Math.hypot(b.vx, b.vy);
@@ -429,6 +466,18 @@ const thud = (g, speed) => {
     playSound("thud", Math.min(1, speed / 14));
 };
 
+// A turbo shot's first bounce keeps all its pace, then it's an ordinary
+// (if very fast) ball again.
+const ricochet = (g, ctx) => {
+    const b = g.ball;
+    if (b.force <= 0) return 0;
+    b.force = 0;
+    g.shake = Math.max(g.shake, 0.35);
+    playSound("zing");
+    burst(ctx.fx, b.x, b.y, "#FDE047", 12, 6, { life: 0.35, size: 0.09 });
+    return 1;
+};
+
 // Grass, walls, crossbars and firewalls.
 const boundBall = (g, h, ctx) => {
     const b = g.ball;
@@ -436,7 +485,8 @@ const boundBall = (g, h, ctx) => {
         b.y = BALL_R;
         if (b.vy < 0) {
             thud(g, -b.vy);
-            b.vy = -b.vy > 1.2 ? -b.vy * GROUND_BOUNCE : 0;
+            const e = ricochet(g, ctx) || GROUND_BOUNCE;
+            b.vy = -b.vy > 1 ? -b.vy * e : 0;
         }
         b.vx *= 1 - ROLL_FRICTION * h;
     }
@@ -444,7 +494,7 @@ const boundBall = (g, h, ctx) => {
         b.y = CEILING - BALL_R;
         if (b.vy > 0) {
             thud(g, b.vy);
-            b.vy = -b.vy * CEILING_BOUNCE;
+            b.vy = -b.vy * (ricochet(g, ctx) || CEILING_BOUNCE);
         }
     }
     if (Math.abs(b.x) > WALL - BALL_R) {
@@ -453,14 +503,15 @@ const boundBall = (g, h, ctx) => {
         b.x = s * (WALL - BALL_R);
         if (b.vx * s > 0) {
             if (!inNet) thud(g, Math.abs(b.vx));
-            b.vx = -b.vx * (inNet ? NET_BOUNCE : WALL_BOUNCE);
+            b.vx = -b.vx * (inNet ? NET_BOUNCE : ricochet(g, ctx) || WALL_BOUNCE);
         }
         b.force = 0;
     }
     for (const s of [-1, 1]) {
-        const impact = hitBar(b, s * HALF, BAR, s * WALL, BAR + ROOF_RISE, ROOF_BOUNCE);
+        const hot = b.force > 0;
+        const impact = hitBar(b, s * HALF, BAR, s * WALL, BAR + ROOF_RISE, hot ? 1 : ROOF_BOUNCE);
         if (impact > 0) {
-            b.force = 0;
+            if (hot) ricochet(g, ctx);
             if (impact > 4 && g.clock - g.lastThud > 0.12) {
                 g.lastThud = g.clock;
                 playSound("post");
@@ -513,7 +564,7 @@ const checkGoal = (g, ctx) => {
     g.pause = PAUSE;
     g.blame = false;
     g.shake = 0.6;
-    g.cheer = { side: scorer, time: 2.6 };
+    g.cheer = { side: scorer, time: PAUSE };
     g.item = null;
     const bot = g.players[1];
     bot.mood = scorer === 1 ? 1 : -1;
@@ -532,6 +583,7 @@ const tickPlayer = (p, dt) => {
     p.stun = Math.max(0, p.stun - dt);
     p.frozen = Math.max(0, p.frozen - dt);
     p.coffee = Math.max(0, p.coffee - dt);
+    p.overclock = Math.max(0, p.overclock - dt);
     p.moodTime = Math.max(0, p.moodTime - dt);
     if (p.moodTime === 0) p.mood = 0;
     p.squash = Math.max(0, p.squash - dt);
@@ -563,8 +615,8 @@ const stepPhysics = (g, dt, mine, theirs, ctx, live) => {
     }
     for (const p of g.players) {
         tickPlayer(p, dt);
-        // The force meter also fills slowly on its own.
-        if (live) p.force = Math.min(1, p.force + dt * 0.018);
+        // The turbo meter also fills slowly on its own.
+        if (live) charge(p, dt * 0.012);
     }
     g.walls[0] = Math.max(0, g.walls[0] - dt);
     g.walls[1] = Math.max(0, g.walls[1] - dt);
@@ -572,8 +624,8 @@ const stepPhysics = (g, dt, mine, theirs, ctx, live) => {
 
 // --- Power-ups -----------------------------------------------------------------
 
-const ITEM_KINDS = ["coffee", "wall", "freeze"];
-export const ITEM_COLORS = { coffee: "#F59E0B", wall: "#F97316", freeze: "#22D3EE" };
+const ITEM_KINDS = ["coffee", "wall", "freeze", "overclock"];
+export const ITEM_COLORS = { coffee: "#F59E0B", wall: "#F97316", freeze: "#22D3EE", overclock: "#E879F9" };
 
 // One floats over the pitch now and then; heading it, or hitting it with
 // the ball, wins it for whoever touched the ball last.
@@ -586,9 +638,9 @@ const stepItems = (g, dt, ctx) => {
             kind: ITEM_KINDS[Math.floor(Math.random() * ITEM_KINDS.length)],
             x: (Math.random() - 0.5) * 9,
             y: 3.1 + Math.random() * 1.3,
-            life: 10,
+            life: 9,
         };
-        g.nextItem = 15 + Math.random() * 6;
+        g.nextItem = 9 + Math.random() * 4;
         playSound("itemSpawn");
         return;
     }
@@ -607,6 +659,7 @@ const stepItems = (g, dt, ctx) => {
     g.item = null;
     const team = taker.side < 0 ? 0 : 1;
     if (it.kind === "coffee") taker.coffee = 8;
+    if (it.kind === "overclock") taker.overclock = 7;
     if (it.kind === "wall") g.walls[team] = 6.5;
     if (it.kind === "freeze") g.players[1 - team].frozen = 2.6;
     playSound(it.kind === "freeze" ? "freeze" : "powerup");
@@ -776,7 +829,7 @@ export const publish = (g, store) => {
     const you = g.players[0];
     const time = Math.max(0, Math.ceil(g.time));
     const force = Math.round(you.force * 20) / 20;
-    const powers = { coffee: you.coffee > 0, wall: g.walls[0] > 0, frozen: you.frozen > 0 };
+    const powers = { coffee: you.coffee > 0, wall: g.walls[0] > 0, frozen: you.frozen > 0, overclock: you.overclock > 0 };
     const summary = `${g.goals.join(":")}|${time}|${g.golden}|${force}|${Object.values(powers).join()}`;
     if (summary === g.published) return;
     g.published = summary;
@@ -799,13 +852,14 @@ export const stepMatch = (g, dt, mine, ctx) => {
     if (g.over) return;
     g.clock += dt;
     g.shake = Math.max(0, g.shake - dt);
+    g.shock.time = Math.max(0, g.shock.time - dt);
     g.cheer.time = Math.max(0, g.cheer.time - dt);
     if (g.pause > 0) {
         g.pause -= dt;
         const slow = g.pause > PAUSE - SLOW_MO ? 0.3 : 1;
         stepPhysics(g, dt * slow, IDLE, IDLE, ctx, false);
         // Then whose fault it was.
-        if (!g.blame && g.pause < PAUSE - 1.1) {
+        if (!g.blame && g.pause < PAUSE - 0.9) {
             g.blame = true;
             ctx.store.say(g.scorer === 0 ? "head.blameBack" : "head.blameFront", null, TEAMS[g.scorer]);
         }

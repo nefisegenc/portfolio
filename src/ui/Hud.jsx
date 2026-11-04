@@ -390,7 +390,8 @@ export const Hud = () => {
                     </div>
                     {!game && <ModeSwitch />}
                 </div>
-                <TopRight helpOpen={helpOpen} onHelp={() => toggleHelp(!helpOpen)} game={game} />
+                {/* Head to Head's ball flies up into that corner of the screen. */}
+                {game !== "head" && <TopRight helpOpen={helpOpen} onHelp={() => toggleHelp(!helpOpen)} game={game} />}
             </div>
             <InteractPrompt />
             {!isTouch && <ControlsHint open={!panel && !game && helpOpen} onClose={() => toggleHelp(false)} />}

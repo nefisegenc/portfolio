@@ -714,6 +714,32 @@ const Crystal = () => (
     </group>
 );
 
+// Overclock: a processor chip, gold pins round a glowing core.
+const Chip = () => (
+    <group rotation-x={0.5}>
+        <mesh>
+            <boxGeometry args={[0.42, 0.42, 0.06]} />
+            <meshStandardMaterial color="#1E1B2E" />
+        </mesh>
+        <mesh position-z={0.035}>
+            <boxGeometry args={[0.22, 0.22, 0.02]} />
+            <GlowMat color="#E879F9" strength={2.4} />
+        </mesh>
+        {[-1, 1].flatMap((s) =>
+            [-0.12, 0, 0.12].flatMap((o) => [
+                <mesh key={`x${s}${o}`} position={[s * 0.25, o, 0]}>
+                    <boxGeometry args={[0.08, 0.04, 0.03]} />
+                    <meshStandardMaterial color="#FACC15" metalness={0.6} roughness={0.3} />
+                </mesh>,
+                <mesh key={`y${s}${o}`} position={[o, s * 0.25, 0]}>
+                    <boxGeometry args={[0.04, 0.08, 0.03]} />
+                    <meshStandardMaterial color="#FACC15" metalness={0.6} roughness={0.3} />
+                </mesh>,
+            ])
+        )}
+    </group>
+);
+
 const Item = ({ set }) => (
     <group ref={set("item")} visible={false}>
         <group ref={set("item_coffee")}>
@@ -724,6 +750,9 @@ const Item = ({ set }) => (
         </group>
         <group ref={set("item_freeze")}>
             <Crystal />
+        </group>
+        <group ref={set("item_overclock")}>
+            <Chip />
         </group>
         <mesh ref={set("itemBubble")}>
             <sphereGeometry args={[0.45, 24, 16]} />
@@ -896,7 +925,7 @@ export const HeadToHead = () => {
         const view = g ?? idle;
         const b = view.ball;
 
-        // Ball, its shadow, and its glow and trail during a force shot.
+        // Ball, its shadow, and its glow and fiery trail during a turbo shot.
         m.ball.position.set(b.x, b.y, 0);
         m.ball.rotation.z = b.spin;
         const shade = Math.max(0.3, 1 - b.y / 7);
@@ -907,14 +936,26 @@ export const HeadToHead = () => {
         if (b.force > 0) {
             const color = TEAMS[b.by?.side > 0 ? 1 : 0];
             m.ballGlow.material.color.set(color);
-            m.ballGlow.scale.setScalar(1 + Math.sin(t * 40) * 0.08);
-            puff(list, b.x, b.y, color, {
-                vx: -b.vx * 0.05,
-                vy: (Math.random() - 0.5) * 0.6,
-                z: (Math.random() - 0.5) * 0.3,
-                life: 0.35,
-                size: 0.16,
-            });
+            m.ballGlow.scale.setScalar(1.15 + Math.sin(t * 40) * 0.12);
+            [color, "#FDE047", "#F97316"].forEach((c, k) =>
+                puff(list, b.x - b.vx * 0.01 * k, b.y, c, {
+                    vx: -b.vx * 0.08 + (Math.random() - 0.5),
+                    vy: (Math.random() - 0.5) * 1.2,
+                    z: (Math.random() - 0.5) * 0.4,
+                    life: 0.4,
+                    size: 0.22 - k * 0.04,
+                })
+            );
+        }
+        // A shockwave where a turbo shot went off.
+        const shock = view.shock;
+        m.shock.visible = shock.time > 0;
+        if (shock.time > 0) {
+            const k = 1 - shock.time / 0.45;
+            m.shock.position.set(shock.x, shock.y, 0);
+            m.shock.scale.setScalar(0.4 + k * 3.2);
+            m.shock.material.color.set(shock.color);
+            m.shock.material.opacity = 0.8 * (1 - k);
         }
 
         view.players.forEach((p, i) => animatePlayer(m, i, p, t, dt));
@@ -932,6 +973,16 @@ export const HeadToHead = () => {
             const ice = m[`ice${i}`];
             ice.visible = p.frozen > 0;
             if (ice.visible) ice.position.set(p.x, p.y + 0.95, 0);
+            // Overclocked: sparks crackling round the head.
+            if (p.overclock > 0 && Math.random() < dt * 22) {
+                const a = Math.random() * Math.PI * 2;
+                puff(list, p.x + Math.cos(a) * 0.8, p.y + HEAD_Y + Math.sin(a) * 0.8, ITEM_COLORS.overclock, {
+                    vx: Math.cos(a) * 1.5,
+                    vy: Math.sin(a) * 1.5 + 0.5,
+                    life: 0.35,
+                    size: 0.08,
+                });
+            }
             if (p.coffee > 0 && Math.random() < dt * 14) {
                 puff(list, p.x + (Math.random() - 0.5) * 0.6, p.y + HEAD_Y + HEAD_R + 0.1, "#E2E8F0", {
                     vy: 1.2,
@@ -956,7 +1007,7 @@ export const HeadToHead = () => {
         if (it) {
             m.item.position.set(it.x, it.y + Math.sin(t * 2.5) * 0.12, 0);
             m.item.rotation.y = t * 1.6;
-            ["coffee", "wall", "freeze"].forEach((kind) => (m[`item_${kind}`].visible = it.kind === kind));
+            ["coffee", "wall", "freeze", "overclock"].forEach((kind) => (m[`item_${kind}`].visible = it.kind === kind));
             m.itemBubble.material.color.set(ITEM_COLORS[it.kind]);
             // Blinks before it goes.
             m.item.scale.setScalar(it.life < 2 && Math.floor(t * 8) % 2 ? 0.85 : 1);
@@ -998,6 +1049,10 @@ export const HeadToHead = () => {
             <group ref={set("ball")}>
                 <BugBallModel />
             </group>
+            <mesh ref={set("shock")} visible={false}>
+                <ringGeometry args={[0.85, 1, 48]} />
+                <meshBasicMaterial transparent depthWrite={false} side={DoubleSide} toneMapped={false} />
+            </mesh>
             <mesh ref={set("ballGlow")} visible={false}>
                 <sphereGeometry args={[BALL_R * 1.5, 20, 14]} />
                 <meshBasicMaterial transparent opacity={0.35} depthWrite={false} toneMapped={false} />

@@ -42,9 +42,10 @@ const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 // Power-ups running for the player, as little tags.
 const Powers = ({ powers }) => {
     const t = useT();
-    if (!powers.coffee && !powers.wall && !powers.frozen) return null;
+    if (!powers.coffee && !powers.wall && !powers.frozen && !powers.overclock) return null;
     return (
-        <p className="flex gap-1 text-[10px] font-extrabold uppercase">
+        <p className="flex flex-wrap gap-1 text-[10px] font-extrabold uppercase">
+            {powers.overclock && <span className="rounded bg-[#E879F9] px-1 text-white">{t("head.chip.overclock")}</span>}
             {powers.coffee && <span className="rounded bg-[#F59E0B] px-1">{t("head.chip.coffee")}</span>}
             {powers.wall && <span className="rounded bg-[#F97316] px-1 text-white">{t("head.chip.wall")}</span>}
             {powers.frozen && <span className="rounded bg-[#22D3EE] px-1">{t("head.chip.frozen")}</span>}
@@ -167,7 +168,7 @@ const ScoreCard = ({ active }) => {
                 />
                 <Stat label="Backend" value={detail.goals[1]} color={BACK} />
                 <div className="w-28 space-y-1">
-                    <Bar label="--force" value={detail.force} color={detail.force >= 1 ? "#EC4899" : "#A855F7"} />
+                    <Bar label={t("head.turbo")} value={detail.force} color={detail.force >= 1 ? "#F97316" : "#A855F7"} />
                     <Powers powers={detail.powers} />
                 </div>
             </>
