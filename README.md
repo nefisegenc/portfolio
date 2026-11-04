@@ -12,7 +12,7 @@ Interactive portfolio of Nefise Nur Genç, front-end developer. Visitors walk ar
   - Cosmic bowling: five frames with real scoring, a power gauge, hook and a pin cam
   - Sky GP: a three-lap kart race on a floating circuit with jumps, obstacles, nitro and three rivals
   - Bug Hunt: a twin-stick wave shooter in a neon server room, defending the core (and yourself) from five waves of bugs and a boss
-  - Riff Rush: a rhythm game on a floating concert stage, playing the guitar part of a seventy-second song over a synthesised band
+  - Riff Rush: a rhythm game on a floating concert stage, playing the guitar part of a two-minute song over a synthesised band
 - Day / night mode
 - Turkish / English interface and content
 - Generative music and sound effects (Web Audio, no audio files), with a mute toggle

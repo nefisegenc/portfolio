@@ -512,9 +512,9 @@ const RiffJudge = () => {
     );
 };
 
-// Five fret buttons along the bottom on touch screens.
+// Four fret buttons along the bottom on touch screens.
 const RiffTouch = () => {
-    useEffect(() => () => [0, 1, 2, 3, 4].forEach((lane) => arcadeLink.fret?.(lane, false)), []);
+    useEffect(() => () => LANE_COLORS.forEach((_, lane) => arcadeLink.fret?.(lane, false)), []);
     return (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 flex justify-center gap-2 px-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {LANE_COLORS.map((c, lane) => {

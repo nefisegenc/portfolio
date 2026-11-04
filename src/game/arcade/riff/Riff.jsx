@@ -1,5 +1,5 @@
 // Riff Rush: a rhythm game on a concert stage floating east of the island.
-// Notes slide down the highway towards five frets; hit a fret's key as its
+// Notes slide down the highway towards four frets; hit a fret's key as its
 // note crosses the line, and hold it through long notes. Hits play the
 // guitar part over the band; misses drain the crowd meter, and an empty
 // meter gets you booed off before the song ends.
@@ -23,9 +23,9 @@ const HIGHWAY = { near: 7, far: -6.5, y: 0.7, lane: 1 };
 const LOOK_AHEAD = 2;
 const NOTE_SPEED = (HIGHWAY.near - HIGHWAY.far) / LOOK_AHEAD;
 const WINDOWS = [
-    { name: "perfect", time: 0.045, points: 100, rock: 0.03, weight: 1, color: "#FACC15" },
-    { name: "great", time: 0.09, points: 70, rock: 0.02, weight: 0.8, color: "#22D3EE" },
-    { name: "good", time: 0.14, points: 40, rock: 0.01, weight: 0.5, color: "#A3E635" },
+    { name: "perfect", time: 0.045, points: 100, rock: 0.035, weight: 1, color: "#FACC15" },
+    { name: "great", time: 0.09, points: 70, rock: 0.03, weight: 0.8, color: "#22D3EE" },
+    { name: "good", time: 0.14, points: 40, rock: 0.02, weight: 0.5, color: "#A3E635" },
 ];
 const MISS = { rock: -0.03, color: "#EF4444" };
 const OVERSTRUM = -0.015;
@@ -374,7 +374,7 @@ const Highway = ({ set }) => {
                     <meshBasicMaterial color={i === 0 || i === LANES ? "#F472B6" : "#475569"} toneMapped={false} />
                 </mesh>
             ))}
-            {/* Strike line and the five frets */}
+            {/* Strike line and the four frets */}
             <mesh rotation-x={-Math.PI / 2} position={[0, 0.015, HIGHWAY.near]}>
                 <planeGeometry args={[width + 0.3, 0.06]} />
                 <meshBasicMaterial color="#F8FAFC" toneMapped={false} />

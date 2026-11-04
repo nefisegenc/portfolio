@@ -116,6 +116,8 @@ export const riffMusic = {
         if (s % 4 === 0) kick(t, 0.5);
         if (s === 6 || s === 10) kick(t, 0.35);
         if (s === 4 || s === 12) snare(t, 0.2);
+        // The pre-chorus drives harder into the chorus.
+        if (sectionAt(bar) === "pre" && s % 4 === 2) snare(t, 0.08);
         if (s % 2 === 1) hat(t, 0.03);
         if (s % 4 === 2) hat(t, 0.045, true);
         if (s % 2 === 0) note(root * (s % 8 === 6 ? 2 : 1), t, { decay: 0.16, volume: 0.12, filter: 520 });
