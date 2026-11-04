@@ -16,8 +16,10 @@ import { arcadeLink, useArcade } from "../state";
 import {
     BALL_R,
     BAR,
+    CEILING,
     GOAL_WIDTH,
     HALF,
+    HEAD_R,
     HEAD_Y,
     ITEM_COLORS,
     KICK_TIME,
@@ -40,7 +42,7 @@ const RADIUS = 15;
 const PITCH = { length: 2 * WALL + 1.6, depth: 8, touch: 3 };
 // Both players turn a little towards the camera rather than showing it
 // their profile.
-const TURN = 0.5;
+const TURN = 0.85;
 const YOU_YAW = stadiumYaw(Math.cos(TURN), Math.sin(TURN));
 const BOT_YAW = Math.atan2(-Math.cos(TURN), Math.sin(TURN));
 const TIERS = [0, 1, 2].map((i) => ({ z: -4.6 - i * 1.1, top: 0.55 + i * 0.55 }));
@@ -301,6 +303,43 @@ const Floodlight = ({ x }) => {
     );
 };
 
+// The cage the ball bounces round: a glass ceiling, and glass walls above
+// the goals, edged in neon.
+const Glass = () => <meshBasicMaterial color="#22D3EE" transparent opacity={0.07} side={DoubleSide} depthWrite={false} toneMapped={false} />;
+
+const Cage = () => {
+    const low = BAR + ROOF_RISE;
+    const height = CEILING - low;
+    return (
+        <group>
+            <mesh position-y={CEILING} rotation-x={Math.PI / 2}>
+                <planeGeometry args={[2 * WALL, GOAL_WIDTH]} />
+                <Glass />
+            </mesh>
+            {[-1, 1].map((s) => (
+                <mesh key={s} position={[s * WALL, low + height / 2, 0]} rotation-y={Math.PI / 2}>
+                    <planeGeometry args={[GOAL_WIDTH, height]} />
+                    <Glass />
+                </mesh>
+            ))}
+            {[-1, 1].map((side) => (
+                <group key={side} position-z={(side * GOAL_WIDTH) / 2}>
+                    <mesh position-y={CEILING}>
+                        <boxGeometry args={[2 * WALL + 0.06, 0.06, 0.06]} />
+                        <GlowMat color="#22D3EE" strength={2} />
+                    </mesh>
+                    {[-1, 1].map((s) => (
+                        <mesh key={s} position={[s * WALL, low + height / 2, 0]}>
+                            <boxGeometry args={[0.06, height, 0.06]} />
+                            <GlowMat color="#22D3EE" strength={2} />
+                        </mesh>
+                    ))}
+                </group>
+            ))}
+        </group>
+    );
+};
+
 const Stadium = ({ set }) => {
     const grass = useMemo(() => grassTexture(), []);
     return (
@@ -321,6 +360,7 @@ const Stadium = ({ set }) => {
             </mesh>
             <Goal side={-1} />
             <Goal side={1} />
+            <Cage />
             <Boards set={set} />
             {/* Stands: three tiers with neon edges in the teams' colours */}
             <Shadowed>
@@ -404,121 +444,222 @@ export const BugBallModel = () => (
     </group>
 );
 
-// --- The Backend Bot -------------------------------------------------------------
+// --- The players: big heads on a single boot ------------------------------------------
 
-const METAL = { color: "#475569", metalness: 0.4, roughness: 0.4 };
+// The boot hangs from a pivot inside the bottom of the head and swings
+// forward to kick.
+const Boot = ({ set, name, color, glow }) => (
+    <group ref={set(name)} position={[0, 0.42, 0.05]}>
+        <mesh position={[0, -0.24, 0.1]} rotation-x={Math.PI / 2} castShadow>
+            <capsuleGeometry args={[0.14, 0.3, 6, 12]} />
+            <meshStandardMaterial color={color} roughness={0.45} />
+        </mesh>
+        <mesh position={[0, -0.36, 0.12]}>
+            <boxGeometry args={[0.3, 0.06, 0.6]} />
+            <meshStandardMaterial color="#F8FAFC" roughness={0.6} />
+        </mesh>
+        <mesh position={[0, -0.22, 0.3]}>
+            <boxGeometry args={[0.29, 0.04, 0.1]} />
+            <GlowMat color={glow} strength={2} />
+        </mesh>
+    </group>
+);
 
-// A robot with a database for a head: three stacked platters with green
-// status lights between them, and a little screen for a face.
-const BackendBot = ({ set }) => (
-    <group ref={set("bot")}>
-        <Shadowed>
-            <group ref={set("botBody")}>
-                {[-1, 1].map((s) => (
-                    <group key={s} ref={set(s < 0 ? "botLeftLeg" : "botRightLeg")} position={[s * 0.13, 0.78, 0]}>
-                        <mesh position-y={-0.3}>
-                            <capsuleGeometry args={[0.075, 0.42, 6, 10]} />
-                            <meshStandardMaterial {...METAL} />
-                        </mesh>
-                        <mesh position={[0, -0.7, 0.06]}>
-                            <boxGeometry args={[0.17, 0.12, 0.28]} />
-                            <meshStandardMaterial color="#0F172A" />
-                        </mesh>
-                    </group>
-                ))}
-                <mesh position-y={1.05}>
-                    <boxGeometry args={[0.5, 0.56, 0.34]} />
-                    <meshStandardMaterial color="#334155" metalness={0.3} roughness={0.5} />
-                </mesh>
-                <mesh position-y={1.4}>
-                    <cylinderGeometry args={[0.08, 0.1, 0.16, 10]} />
-                    <meshStandardMaterial {...METAL} />
-                </mesh>
-                {[-1, 1].map((s) => (
-                    <group key={s} ref={set(s < 0 ? "botLeftArm" : "botRightArm")} position={[s * 0.32, 1.26, 0]} rotation-z={s * 0.18}>
-                        <mesh position-y={-0.24}>
-                            <capsuleGeometry args={[0.06, 0.36, 6, 10]} />
-                            <meshStandardMaterial {...METAL} />
-                        </mesh>
-                    </group>
-                ))}
-                <group position-y={HEAD_Y}>
-                    {[-0.23, 0, 0.23].map((y) => (
-                        <mesh key={y} position-y={y}>
-                            <cylinderGeometry args={[0.38, 0.38, 0.2, 28]} />
-                            <meshStandardMaterial color="#64748B" metalness={0.35} roughness={0.35} />
-                        </mesh>
-                    ))}
-                    <mesh position-y={0.335}>
-                        <cylinderGeometry args={[0.34, 0.38, 0.04, 28]} />
-                        <meshStandardMaterial color="#64748B" metalness={0.35} roughness={0.35} />
+// Stars circling a head knocked silly by a force shot.
+const Dizzy = ({ set, name }) => (
+    <group ref={set(name)} position-y={HEAD_Y + HEAD_R + 0.25} visible={false}>
+        {[0, 1, 2].map((i) => (
+            <mesh key={i} position={[Math.cos((i * Math.PI * 2) / 3) * 0.45, 0, Math.sin((i * Math.PI * 2) / 3) * 0.45]}>
+                <octahedronGeometry args={[0.09, 0]} />
+                <GlowMat color="#FDE047" strength={2.4} />
+            </mesh>
+        ))}
+    </group>
+);
+
+// Her colours, as on the island's avatar.
+const FACE = "#E8C4B8";
+const HairMat = () => <meshStandardMaterial color="#E8C078" roughness={0.7} />;
+
+// Nefise as a big head: long blonde hair, green eyes, a smile and the
+// neon collar from her coat.
+const NefiseHead = ({ set }) => (
+    <group>
+        <mesh castShadow>
+            <sphereGeometry args={[0.7, 40, 32]} />
+            <meshStandardMaterial color={FACE} roughness={0.5} />
+        </mesh>
+        <mesh rotation-x={-0.25}>
+            <sphereGeometry args={[0.74, 40, 24, 0, Math.PI * 2, 0, Math.PI * 0.36]} />
+            <HairMat />
+        </mesh>
+        <mesh position={[0, 0.05, -0.2]} scale={[1.02, 1, 0.9]}>
+            <sphereGeometry args={[0.72, 32, 24]} />
+            <HairMat />
+        </mesh>
+        {[-1, 1].map((s) => (
+            <mesh key={s} position={[s * 0.6, -0.15, 0.22]} rotation={[0.15, 0, s * 0.12]}>
+                <capsuleGeometry args={[0.13, 0.55, 8, 12]} />
+                <HairMat />
+            </mesh>
+        ))}
+        <mesh position={[0, -0.38, -0.3]} scale={[1, 1, 0.7]}>
+            <capsuleGeometry args={[0.55, 0.3, 12, 20]} />
+            <HairMat />
+        </mesh>
+        <group ref={set("youEyes")} position-y={0.02}>
+            {[-1, 1].map((s) => (
+                <group key={s} position={[s * 0.25, 0, 0.6]}>
+                    <mesh scale={[1, 1.15, 0.45]}>
+                        <sphereGeometry args={[0.13, 20, 16]} />
+                        <meshStandardMaterial color="#FFFFFF" roughness={0.3} />
                     </mesh>
-                    <mesh position-y={0.46}>
-                        <cylinderGeometry args={[0.012, 0.012, 0.22, 6]} />
-                        <meshStandardMaterial color="#94A3B8" />
+                    <mesh position={[0, -0.01, 0.045]} scale={[1, 1.15, 0.4]}>
+                        <sphereGeometry args={[0.085, 18, 14]} />
+                        <meshStandardMaterial color="#4A7C59" roughness={0.3} />
+                    </mesh>
+                    <mesh position={[0, -0.01, 0.07]}>
+                        <sphereGeometry args={[0.045, 12, 10]} />
+                        <meshBasicMaterial color="#111111" />
+                    </mesh>
+                    <mesh position={[-0.03, 0.03, 0.09]}>
+                        <sphereGeometry args={[0.02, 8, 6]} />
+                        <meshBasicMaterial color="#FFFFFF" />
                     </mesh>
                 </group>
-            </group>
-        </Shadowed>
-        {/* Status lights, face and antenna light stay out of the shadows. */}
-        <group ref={set("botHead")} position-y={HEAD_Y}>
-            {[-0.115, 0.115].map((y) => (
-                <mesh key={y} position-y={y}>
-                    <cylinderGeometry args={[0.39, 0.39, 0.03, 28]} />
-                    <GlowMat color={TEAMS[1]} strength={2.2} />
+            ))}
+        </group>
+        {[-1, 1].map((s) => (
+            <mesh key={s} position={[s * 0.25, 0.22, 0.63]} rotation-z={Math.PI / 2 - s * 0.15}>
+                <capsuleGeometry args={[0.022, 0.13, 4, 8]} />
+                <meshStandardMaterial color="#8A6A45" />
+            </mesh>
+        ))}
+        <mesh position={[0, -0.1, 0.69]}>
+            <sphereGeometry args={[0.045, 12, 10]} />
+            <meshStandardMaterial color="#DDB8A8" />
+        </mesh>
+        <mesh position={[0, -0.21, 0.655]} rotation-z={Math.PI}>
+            <torusGeometry args={[0.1, 0.022, 8, 20, Math.PI]} />
+            <meshStandardMaterial color="#C4706E" />
+        </mesh>
+        {[-1, 1].map((s) => (
+            <mesh key={s} position={[s * 0.42, -0.12, 0.53]} scale={[1, 0.6, 0.3]}>
+                <sphereGeometry args={[0.08, 12, 10]} />
+                <meshStandardMaterial color="#F4A3A8" />
+            </mesh>
+        ))}
+        <mesh position-y={-0.66} rotation-x={Math.PI / 2}>
+            <torusGeometry args={[0.3, 0.035, 8, 32]} />
+            <GlowMat color="#3BE8FF" strength={2} />
+        </mesh>
+    </group>
+);
+
+// The Backend Bot: a database for a head (three platters with green status
+// lights between them) and a little screen for a face.
+const BotHead = ({ set }) => (
+    <group>
+        {[-0.47, 0, 0.47].map((y) => (
+            <mesh key={y} position-y={y} castShadow>
+                <cylinderGeometry args={[0.7, 0.7, 0.42, 40]} />
+                <meshStandardMaterial color="#64748B" metalness={0.35} roughness={0.35} />
+            </mesh>
+        ))}
+        <mesh position-y={0.7}>
+            <cylinderGeometry args={[0.64, 0.7, 0.05, 40]} />
+            <meshStandardMaterial color="#94A3B8" metalness={0.35} roughness={0.35} />
+        </mesh>
+        {[-0.235, 0.235].map((y) => (
+            <mesh key={y} position-y={y}>
+                <cylinderGeometry args={[0.715, 0.715, 0.05, 40]} />
+                <GlowMat color={TEAMS[1]} strength={2.2} />
+            </mesh>
+        ))}
+        <group position={[0, 0.02, 0.66]}>
+            <mesh>
+                <boxGeometry args={[0.78, 0.36, 0.1]} />
+                <meshStandardMaterial color="#052E16" />
+            </mesh>
+            {[-1, 1].map((s) => (
+                <mesh key={s} ref={set(s < 0 ? "botEyeL" : "botEyeR")} position={[s * 0.18, 0.03, 0.055]}>
+                    <boxGeometry args={[0.12, 0.15, 0.01]} />
+                    <GlowMat color={TEAMS[1]} strength={2.6} />
                 </mesh>
             ))}
-            <group position={[0, 0, 0.37]}>
-                <mesh>
-                    <boxGeometry args={[0.46, 0.17, 0.05]} />
-                    <meshStandardMaterial color="#052E16" />
-                </mesh>
-                {[-1, 1].map((s) => (
-                    <mesh key={s} ref={set(s < 0 ? "botEyeL" : "botEyeR")} position={[s * 0.1, 0.01, 0.03]}>
-                        <boxGeometry args={[0.07, 0.08, 0.01]} />
-                        <GlowMat color={TEAMS[1]} strength={2.6} />
-                    </mesh>
-                ))}
-            </group>
-            <mesh ref={set("botLed")} position-y={0.6}>
-                <sphereGeometry args={[0.05, 12, 10]} />
-                <GlowMat color={TEAMS[1]} strength={3} />
+            <mesh ref={set("botMouth")} position={[0, -0.11, 0.055]}>
+                <boxGeometry args={[0.2, 0.03, 0.01]} />
+                <GlowMat color={TEAMS[1]} strength={2.2} />
             </mesh>
+        </group>
+        <mesh position-y={0.85}>
+            <cylinderGeometry args={[0.02, 0.02, 0.3, 6]} />
+            <meshStandardMaterial color="#94A3B8" />
+        </mesh>
+        <mesh ref={set("botLed")} position-y={1.03}>
+            <sphereGeometry args={[0.07, 12, 10]} />
+            <GlowMat color={TEAMS[1]} strength={3} />
+        </mesh>
+    </group>
+);
+
+// A player: the root moves and leans with the match, `Turn` faces the
+// camera three-quarters on, `Head` bobs and squashes, `Foot` kicks.
+const Baller = ({ set, id, boot, glow, children }) => (
+    <group ref={set(id)}>
+        <group ref={set(`${id}Turn`)}>
+            <group ref={set(`${id}Head`)} position-y={HEAD_Y}>
+                {children}
+            </group>
+            <Boot set={set} name={`${id}Foot`} color={boot} glow={glow} />
+            <Dizzy set={set} name={`${id}Dizzy`} />
         </group>
     </group>
 );
 
-const bot = { phase: 0 };
-
 const lerp = (a, b, t) => a + (b - a) * t;
+const YAWS = [Math.atan2(Math.cos(TURN), Math.sin(TURN)), BOT_YAW];
+const strides = [0, 0.6];
 
-const animateBot = (m, p, t, dt) => {
-    m.bot.position.set(p.x, p.y, 0);
-    m.bot.rotation.y = BOT_YAW;
+const animatePlayer = (m, i, p, t, dt) => {
+    const root = m[`p${i}`];
+    const turn = m[`p${i}Turn`];
+    const head = m[`p${i}Head`];
+    const foot = m[`p${i}Foot`];
+    const dizzy = m[`p${i}Dizzy`];
+    root.position.set(p.x, p.y, 0);
+    turn.rotation.y = YAWS[i];
+    dizzy.visible = p.stun > 0;
+    if (dizzy.visible) dizzy.rotation.y = t * 6;
+    m[`shadow${i}`].position.set(p.x, 0.015, 0);
+    m[`shadow${i}`].scale.setScalar(Math.max(0.35, 1 - p.y / 3));
     if (p.frozen > 0) return;
     const speed = Math.abs(p.vx);
-    bot.phase += dt * (4 + speed * 1.6);
-    const swing = Math.sin(bot.phase) * 0.7 * Math.min(speed / 4.6, 1.2);
+    const run = Math.min(1, speed / 4);
     const air = p.y > 0.02;
-    const k = 1 - Math.min(1, dt * 14);
-    const legL = air ? -0.5 : swing;
-    const legR = p.kick > 0 ? kickAngle(1 - p.kick / KICK_TIME) : air ? 0.3 : -swing;
-    m.botLeftLeg.rotation.x = lerp(legL, m.botLeftLeg.rotation.x, k);
-    m.botRightLeg.rotation.x = p.kick > 0 ? legR : lerp(legR, m.botRightLeg.rotation.x, k);
-    m.botLeftArm.rotation.x = lerp(air ? -2.4 : -swing * 0.9, m.botLeftArm.rotation.x, k);
-    m.botRightArm.rotation.x = lerp(air ? -2.4 : swing * 0.9, m.botRightArm.rotation.x, k);
-    // Knocked flat by a force shot: rocked back for a moment.
-    const lean = p.stun > 0 ? -0.55 : p.mood > 0 ? -0.1 : 0;
-    m.botBody.rotation.x = lerp(lean, m.botBody.rotation.x, k);
-    m.botBody.position.y = air ? 0 : Math.abs(Math.sin(bot.phase)) * 0.05 * Math.min(speed / 4.6, 1);
-    m.botHead.rotation.x = m.botBody.rotation.x;
-    m.botHead.position.y = HEAD_Y + m.botBody.position.y;
-    // Its face: pleased (squinting), upset (eyes slanting), or watching.
-    const eyeTilt = p.mood < 0 ? 0.5 : 0;
-    const squint = p.mood > 0 ? 0.35 : p.stun > 0 ? 0.15 : 1;
-    m.botEyeL.rotation.z = -eyeTilt;
-    m.botEyeR.rotation.z = eyeTilt;
+    const k = Math.min(1, dt * 12);
+    strides[i] += dt * (6 + speed * 2);
+    // Hops along leaning into the run; squashes on headers and landings,
+    // stretches on the way up; rocks back when knocked silly.
+    head.position.y = HEAD_Y + (air ? 0 : Math.abs(Math.sin(strides[i])) * 0.08 * run);
+    root.rotation.z = lerp(root.rotation.z, (-p.vx / 6) * 0.16, k);
+    turn.rotation.x = lerp(turn.rotation.x, p.stun > 0 ? -0.5 : 0, k);
+    const squash = p.squash / 0.16;
+    const stretch = air && p.vy > 2 ? 0.05 : 0;
+    head.scale.set(1 + squash * 0.12 - stretch, 1 - squash * 0.16 + stretch, 1 + squash * 0.12 - stretch);
+    foot.rotation.x = p.kick > 0 ? kickAngle(1 - p.kick / KICK_TIME) : lerp(foot.rotation.x, air ? -0.5 : Math.sin(strides[i]) * 0.55 * run, k);
+};
+
+// Faces: Nefise blinks now and then; the bot squints when pleased, slants
+// its eyes when upset and looks stunned when knocked over.
+const animateFaces = (m, [you, them], t) => {
+    m.youEyes.scale.y = you.stun > 0 ? 0.3 : t % 3.4 < 0.12 ? 0.15 : 1;
+    const tilt = them.mood < 0 ? 0.5 : 0;
+    const squint = them.mood > 0 ? 0.35 : them.stun > 0 ? 0.15 : 1;
+    m.botEyeL.rotation.z = -tilt;
+    m.botEyeR.rotation.z = tilt;
     m.botEyeL.scale.y = m.botEyeR.scale.y = squint;
+    m.botMouth.scale.x = them.mood > 0 ? 1.6 : them.mood < 0 ? 0.5 : 1;
     m.botLed.visible = Math.floor(t * 3) % 2 === 0;
 };
 
@@ -649,7 +790,7 @@ const toWorld = (v, x, y, z) => {
 // Far enough back to fit both goals on a wide screen; on a narrow one the
 // camera follows the ball along the pitch instead. Touch screens frame the
 // pitch higher, clear of the buttons along the bottom.
-const LOOK_Y = isTouch ? 1.8 : 3.4;
+const LOOK_Y = isTouch ? 2.3 : 3.4;
 const aimCamera = (g, size) => {
     const aspect = size.width / Math.max(1, size.height);
     const tan = Math.tan((cam.fov * Math.PI) / 360);
@@ -674,22 +815,16 @@ const readControls = () => {
     return mine;
 };
 
-// The player's avatar is drawn by the player controller: pin it where the
-// match puts it and tell it how to move.
+// The stadium draws you as a big head, so the usual avatar is hidden and
+// just kept where the match puts you.
 const spot = { x: 0, y: 0, z: 0, rotY: YOU_YAW };
-const pose = { speed: 0, air: false, kick: 0, stun: false, frozen: false };
 const placeAvatar = (p) => {
     const [x, y, z] = stadiumToWorld(p.x, p.y, 0);
     spot.x = x;
     spot.y = y;
     spot.z = z;
     arcadeLink.lock = spot;
-    pose.speed = Math.abs(p.vx);
-    pose.air = p.y > 0.02;
-    pose.kick = p.kick > 0 ? 1 - p.kick / KICK_TIME : 0;
-    pose.stun = p.stun > 0;
-    pose.frozen = p.frozen > 0;
-    arcadeLink.pose = pose;
+    arcadeLink.hide = true;
 };
 
 // What the stadium shows between matches: the ball on the centre spot.
@@ -718,6 +853,7 @@ export const HeadToHead = () => {
         spot.y = y;
         spot.z = z;
         arcadeLink.lock = spot;
+        arcadeLink.hide = true;
         arcadeLink.snap = true;
         publish(g, useArcade.getState());
     }, [active, run]);
@@ -759,7 +895,6 @@ export const HeadToHead = () => {
         }
         const view = g ?? idle;
         const b = view.ball;
-        const them = view.players[1];
 
         // Ball, its shadow, and its glow and trail during a force shot.
         m.ball.position.set(b.x, b.y, 0);
@@ -782,9 +917,8 @@ export const HeadToHead = () => {
             });
         }
 
-        animateBot(m, them, t, dt);
-        m.botShadow.position.set(them.x, 0.015, 0);
-        m.botShadow.scale.setScalar(Math.max(0.4, 1 - them.y / 3));
+        view.players.forEach((p, i) => animatePlayer(m, i, p, t, dt));
+        animateFaces(m, view.players, t);
 
         // A ring under each player whose force shot is ready, ice round a
         // frozen one, steam off one full of coffee.
@@ -797,9 +931,9 @@ export const HeadToHead = () => {
             }
             const ice = m[`ice${i}`];
             ice.visible = p.frozen > 0;
-            if (ice.visible) ice.position.set(p.x, p.y + 1.2, 0);
+            if (ice.visible) ice.position.set(p.x, p.y + 0.95, 0);
             if (p.coffee > 0 && Math.random() < dt * 14) {
-                puff(list, p.x + (Math.random() - 0.5) * 0.4, p.y + HEAD_Y + 0.4, "#E2E8F0", {
+                puff(list, p.x + (Math.random() - 0.5) * 0.6, p.y + HEAD_Y + HEAD_R + 0.1, "#E2E8F0", {
                     vy: 1.2,
                     vx: (Math.random() - 0.5) * 0.4,
                     life: 0.6,
@@ -860,7 +994,7 @@ export const HeadToHead = () => {
             <Stadium set={set} />
             {/* The floodlights on the players, only while a match is on (the
                 stadium switches the island to night then anyway). */}
-            {active && <pointLight position={[0, 9, 7]} intensity={170} distance={40} color="#FFF4DD" />}
+            {active && <pointLight position={[0, 7, 10]} intensity={230} distance={45} color="#FFF4DD" />}
             <group ref={set("ball")}>
                 <BugBallModel />
             </group>
@@ -872,20 +1006,27 @@ export const HeadToHead = () => {
                 <circleGeometry args={[BALL_R * 1.1, 20]} />
                 <meshBasicMaterial color="#000000" transparent opacity={0.4} depthWrite={false} />
             </mesh>
-            <BackendBot set={set} />
-            <mesh ref={set("botShadow")} rotation-x={-Math.PI / 2}>
-                <circleGeometry args={[0.42, 20]} />
-                <meshBasicMaterial color="#000000" transparent opacity={0.2} depthWrite={false} />
-            </mesh>
+            <Baller set={set} id="p0" boot="#0E0E12" glow="#3BE8FF">
+                <NefiseHead set={set} />
+            </Baller>
+            <Baller set={set} id="p1" boot="#334155" glow={TEAMS[1]}>
+                <BotHead set={set} />
+            </Baller>
+            {[0, 1].map((i) => (
+                <mesh key={i} ref={set(`shadow${i}`)} rotation-x={-Math.PI / 2}>
+                    <circleGeometry args={[0.7, 24]} />
+                    <meshBasicMaterial color="#000000" transparent opacity={0.22} depthWrite={false} />
+                </mesh>
+            ))}
             <Item set={set} />
             {[0, 1].map((i) => (
                 <group key={i}>
                     <mesh ref={set(`ring${i}`)} rotation-x={-Math.PI / 2} visible={false}>
-                        <ringGeometry args={[0.45, 0.6, 32]} />
+                        <ringGeometry args={[0.72, 0.9, 40]} />
                         <meshBasicMaterial color={TEAMS[i]} transparent opacity={0.85} toneMapped={false} />
                     </mesh>
                     <mesh ref={set(`ice${i}`)} visible={false}>
-                        <boxGeometry args={[1.05, 2.5, 1.05]} />
+                        <boxGeometry args={[1.8, 2, 1.8]} />
                         <meshStandardMaterial color="#A5F3FC" emissive="#22D3EE" emissiveIntensity={0.4} transparent opacity={0.45} roughness={0.1} />
                     </mesh>
                     <mesh ref={set(`wall${i}`)} position={[(i ? 1 : -1) * (HALF - 0.1), BAR / 2, 0]} visible={false}>

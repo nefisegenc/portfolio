@@ -384,7 +384,8 @@ export const Hud = () => {
         <motion.div className="pointer-events-none fixed inset-0 z-10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
             <div className="flex items-start justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:p-6">
                 <div className="flex flex-col items-start gap-2 md:flex-row md:items-center md:gap-3">
-                    <div className="pointer-events-auto">
+                    {/* Phones held sideways need the top edge for a game's score card. */}
+                    <div className={`pointer-events-auto ${game ? "[@media(max-height:520px)]:hidden" : ""}`}>
                         <PlayerBadge />
                     </div>
                     {!game && <ModeSwitch />}

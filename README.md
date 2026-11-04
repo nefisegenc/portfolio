@@ -4,7 +4,7 @@ Interactive portfolio of Nefise Nur Genç, front-end developer. Visitors walk ar
 
 ## Features
 
-- Third-person character with walking, running and jumping
+- Third-person character with walking, running and jumping, and a camera that swings round behind her as she walks (drag to look around)
 - A landmark for each project, each opening a project panel
 - Discovery tracker with an achievement once every project is found
 - Minimap and a full map with fast travel
@@ -13,7 +13,7 @@ Interactive portfolio of Nefise Nur Genç, front-end developer. Visitors walk ar
   - Sky GP: a three-lap kart race on a floating circuit with jumps, obstacles, nitro and three rivals
   - Bug Hunt: a twin-stick wave shooter in a neon server room, defending the core (and yourself) from five waves of bugs and a boss
   - Riff Rush: a rhythm game on a floating concert stage, playing the guitar part of a two-minute song over a synthesised band
-  - Head to Head: one-on-one head-ball in a floodlit stadium, Frontend against the Backend Bot with a curled-up bug for a ball, kicks, headers, a `--force` power shot and power-ups (caffeine, firewall, code freeze)
+  - Head to Head: one-on-one head-ball in a floodlit stadium, big heads on a single boot (Frontend against the Backend Bot) with a curled-up bug for a ball that ricochets round a neon cage, headers, kicks, a `--force` power shot and power-ups (caffeine, firewall, code freeze)
 - Day / night mode
 - Turkish / English interface and content
 - Generative music and sound effects (Web Audio, no audio files), with a mute toggle

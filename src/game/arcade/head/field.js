@@ -33,15 +33,19 @@ export const WALL = 9.5;
 export const BAR = 3.2;
 export const ROOF_RISE = 0.4;
 const BAR_R = 0.07;
-const CEILING = 9;
+// The pitch is a neon cage: the ball bounces off the ceiling and the walls
+// above the goals straight back into play.
+export const CEILING = 7.6;
 export const GOAL_WIDTH = 3.4;
 
 export const BALL_R = 0.3;
-export const HEAD_Y = 1.8;
-export const HEAD_R = 0.37;
-const BODY_LOW = 0.3;
-const BODY_HIGH = 1.3;
-const BODY_R = 0.27;
+// The players are big heads on a single boot: the head does most of the
+// work, the boot kicks.
+export const HEAD_Y = 1.05;
+export const HEAD_R = 0.75;
+const BODY_LOW = 0.2;
+const BODY_HIGH = 0.45;
+const BODY_R = 0.3;
 const ITEM_R = 0.45;
 
 const MATCH_TIME = 90;
@@ -60,25 +64,32 @@ const SPEED = 6;
 const BOT_SPEED = 5.4;
 const ACCEL = 50;
 const AIR_ACCEL = 26;
-const JUMP = 8.8;
+const JUMP = 9.2;
 const GRAVITY = 26;
 
+// A lively ball: bouncy off the grass, the walls and the ceiling.
 const BALL_GRAVITY = 15;
-const AIR_DRAG = 0.25;
-const ROLL_FRICTION = 2;
-const GROUND_BOUNCE = 0.6;
-const WALL_BOUNCE = 0.6;
+const AIR_DRAG = 0.08;
+const ROLL_FRICTION = 0.9;
+const GROUND_BOUNCE = 0.72;
+const WALL_BOUNCE = 0.85;
+const CEILING_BOUNCE = 0.85;
 const NET_BOUNCE = 0.25;
-const ROOF_BOUNCE = 0.55;
+const ROOF_BOUNCE = 0.7;
 const MAX_BALL = 25;
 
-// A kick swings the foot through the space in front of the player.
+// A kick swings the boot through the space in front of the player.
 export const KICK_TIME = 0.28;
+const KICK_X = 0.62;
+const KICK_Y = 0.3;
 // The kicking leg's swing, `k` from 0 to 1 through a kick: it winds back,
 // swings through and drops back down.
 export const kickAngle = (k) => (k < 0.2 ? 0.8 * (k / 0.2) : k < 0.55 ? 0.8 - 2.6 * ((k - 0.2) / 0.35) : -1.8 * (1 - (k - 0.55) / 0.45));
 const KICK_COOLDOWN = 0.36;
-const KICK_REACH = 0.62;
+const KICK_REACH = 0.45;
+// How far out the boot meets a ball `front` metres ahead, 0 (tucked in)
+// to 1 (full stretch).
+const reachOf = (front) => (front - 0.45) / 0.7;
 // A full force meter turns the next kick into a flat, fast shot that
 // bowls over whoever it hits ("git push --force").
 const FORCE_SPEED = 19;
@@ -110,6 +121,8 @@ const newPlayer = (side) => ({
     // The bot's face: 1 pleased, -1 upset, for `moodTime` seconds.
     mood: 0,
     moodTime: 0,
+    // Seconds left of a squash (a header, a landing), for the looks.
+    squash: 0,
 });
 
 export const newGame = () => ({
@@ -179,7 +192,7 @@ const speedOf = (g, p) => {
         const lead = g.goals[1] - g.goals[0];
         if (lead >= 2) speed *= 0.9;
         if (lead <= -2) speed *= 1.07;
-        if (g.ai.sprint) speed *= 1.3;
+        if (g.ai.sprint) speed *= 1.2;
     }
     return speed * (p.coffee > 0 ? 1.3 : 1);
 };
@@ -199,16 +212,18 @@ const movePlayer = (g, p, ctrl, h) => {
     p.x += p.vx * h;
     p.y += p.vy * h;
     if (p.y <= 0) {
+        // A thump on landing squashes the head for a moment.
+        if (p.vy < -5) p.squash = 0.12;
         p.y = 0;
         p.vy = 0;
     }
-    const limit = WALL - BODY_R - 0.05;
+    const limit = WALL - HEAD_R - 0.05;
     if (Math.abs(p.x) > limit) {
         p.x = Math.sign(p.x) * limit;
         p.vx = 0;
     }
-    // Into the goal only on foot: a head would hit the crossbar.
-    const mouth = HALF - BODY_R;
+    // Into the goal only low down: a head would hit the crossbar.
+    const mouth = HALF - HEAD_R;
     const cap = BAR - HEAD_Y - HEAD_R - 0.02;
     if (Math.abs(p.x) > mouth && p.y > cap) {
         if (Math.abs(wasX) <= mouth) {
@@ -221,15 +236,20 @@ const movePlayer = (g, p, ctrl, h) => {
     }
 };
 
-// Players can't stand in each other, unless one jumps clean over the
-// other, nor close in on a ball wedged between them.
+// Two heads can't overlap (one can sail over the other in a jump), nor
+// close in on a ball wedged between them.
 const separate = (a, c, ball) => {
-    if (Math.abs(a.y - c.y) > 1.7) return;
+    const span = 2 * HEAD_R;
+    const dy = c.y - a.y;
+    if (Math.abs(dy) >= span) return;
+    let gap = Math.sqrt(span * span - dy * dy);
+    if (ball.x > Math.min(a.x, c.x) && ball.x < Math.max(a.x, c.x)) {
+        const fit = HEAD_R + BALL_R;
+        const level = ball.y - ((a.y + c.y) / 2 + HEAD_Y);
+        if (Math.abs(level) < fit) gap = Math.max(gap, 2 * Math.sqrt(fit * fit - level * level) + 0.04);
+    }
     const dx = c.x - a.x;
-    const between = ball.x > Math.min(a.x, c.x) && ball.x < Math.max(a.x, c.x);
-    const low = ball.y < Math.max(a.y, c.y) + BODY_HIGH + BALL_R;
-    const gap = between && low ? 2 * (BODY_R + BALL_R) + 0.04 : 0.62;
-    if (Math.abs(dx) > gap) return;
+    if (Math.abs(dx) >= gap) return;
     const push = ((gap - Math.abs(dx)) / 2) * (dx >= 0 ? 1 : -1);
     a.x -= push;
     c.x += push;
@@ -298,6 +318,7 @@ const touched = (g, p, sound, gain) => {
     if (g.clock - p.touch > 0.15) {
         playSound(sound);
         p.force = Math.min(1, p.force + gain);
+        if (sound === "header") p.squash = 0.16;
     }
     p.touch = g.clock;
 };
@@ -328,7 +349,7 @@ const kickBall = (g, p, ctx) => {
             // Off the grass, where the foot meets the ball sets the shot: a
             // ball tucked in close is chipped up and over, one met at full
             // stretch is driven low and hard.
-            const [vx, vy] = groundKick(((b.x - p.x) * f - 0.15) / 0.95);
+            const [vx, vy] = groundKick(reachOf((b.x - p.x) * f));
             b.vx = f * vx + p.vx * 0.35;
             b.vy = vy;
         } else {
@@ -352,7 +373,7 @@ const touchBall = (g, p, ctx) => {
     if (b.ghost === p && b.ghostTime > 0) return;
     const swing = KICK_TIME - p.kick;
     if (p.kick > 0 && !p.kicked && swing > 0.03 && swing < 0.2) {
-        if (Math.hypot(b.x - (p.x + p.facing * 0.55), b.y - (p.y + 0.5)) < KICK_REACH + BALL_R) {
+        if (Math.hypot(b.x - (p.x + p.facing * KICK_X), b.y - (p.y + KICK_Y)) < KICK_REACH + BALL_R) {
             p.kicked = true;
             kickBall(g, p, ctx);
             return;
@@ -421,7 +442,10 @@ const boundBall = (g, h, ctx) => {
     }
     if (b.y > CEILING - BALL_R) {
         b.y = CEILING - BALL_R;
-        b.vy = -Math.abs(b.vy) * 0.5;
+        if (b.vy > 0) {
+            thud(g, b.vy);
+            b.vy = -b.vy * CEILING_BOUNCE;
+        }
     }
     if (Math.abs(b.x) > WALL - BALL_R) {
         const s = Math.sign(b.x);
@@ -470,8 +494,11 @@ const unsqueeze = (g) => {
             b.x = p.x + side * (BODY_R + BALL_R + 0.02);
             b.vx = side * Math.max(Math.abs(b.vx), 2.5);
         } else {
-            const clear = b.y > p.y + BODY_HIGH ? HEAD_R : BODY_R;
-            p.x = b.x - side * (clear + BALL_R + 0.02);
+            // Far enough sideways to clear the head at the ball's height.
+            const fit = HEAD_R + BALL_R + 0.02;
+            const level = b.y - (p.y + HEAD_Y);
+            const clear = Math.max(BODY_R + BALL_R + 0.02, Math.sqrt(Math.max(0, fit * fit - level * level)));
+            p.x = b.x - side * clear;
         }
     }
 };
@@ -507,6 +534,7 @@ const tickPlayer = (p, dt) => {
     p.coffee = Math.max(0, p.coffee - dt);
     p.moodTime = Math.max(0, p.moodTime - dt);
     if (p.moodTime === 0) p.mood = 0;
+    p.squash = Math.max(0, p.squash - dt);
 };
 
 const startKick = (p, ctrl) => {
@@ -606,9 +634,13 @@ const forecast = (b) => {
                 vy = Math.abs(vy) > 1.2 ? Math.abs(vy) * GROUND_BOUNCE : 0;
                 vx *= 1 - ROLL_FRICTION * h;
             }
+            if (y > CEILING - BALL_R) {
+                y = CEILING - BALL_R;
+                vy = -Math.abs(vy) * CEILING_BOUNCE;
+            }
             if (Math.abs(x) > WALL - BALL_R) {
                 x = Math.sign(x) * (WALL - BALL_R);
-                vx = -vx * 0.5;
+                vx = -vx * (y < BAR ? NET_BOUNCE : WALL_BOUNCE);
             }
         }
         pt.x = x;
@@ -641,11 +673,12 @@ const thinkBot = (g, dt) => {
     if (bot.frozen > 0 || bot.stun > 0) return out;
     forecast(b);
     const speed = speedOf(g, bot);
+    // Where it can play the ball: low ones with the boot (ball in front of
+    // it), the rest with its head, a little to its own goal's side.
     let reach = null;
     for (const pt of PATH) {
-        if (pt.y > 3.3) continue;
-        const air = pt.y > 1.3;
-        const x = pt.x + (air ? 0.18 : 0.5);
+        if (pt.y > HEAD_Y + HEAD_R + 1.7) continue;
+        const x = pt.x + (pt.y < 0.75 ? KICK_X + 0.1 : 0.4);
         if (Math.abs(x - bot.x) <= speed * pt.t + 0.25) {
             reach = { x, y: pt.y, t: pt.t };
             break;
@@ -669,12 +702,12 @@ const thinkBot = (g, dt) => {
     } else spot = Math.max(b.x + 2.6, 3.4);
     ai.jitterTime -= dt;
     if (ai.jitterTime <= 0) {
-        ai.jitter = (Math.random() - 0.5) * 0.5;
+        ai.jitter = (Math.random() - 0.5) * 0.7;
         ai.jitterTime = 0.6;
     }
     spot = Math.max(-HALF + 0.6, Math.min(WALL - 0.5, spot + ai.jitter));
     const lead = g.goals[1] - g.goals[0];
-    ai.target += (spot - ai.target) * Math.min(1, dt * (lead >= 2 ? 5 : 8));
+    ai.target += (spot - ai.target) * Math.min(1, dt * (lead >= 2 ? 4 : 6));
     const gap = ai.target - bot.x;
     if (Math.abs(gap) > 0.12) out.move = Math.sign(gap) * Math.min(1, Math.abs(gap) * 2.5 + 0.3);
 
@@ -683,9 +716,9 @@ const thinkBot = (g, dt) => {
         const dx = b.x - bot.x;
         // Balls at head height or lower it plays standing; higher ones it
         // jumps for, timed to meet them on the way up.
-        const header = lift > 0.3 && when < riseTime(lift) + 0.04 && Math.abs(spot - bot.x) < 0.8;
-        const block = b.vx > 4 && b.y > HEAD_Y + 0.35 && b.y < 3.4 && -dx > 0.4 && -dx < 2.6;
-        const hop = behind && dx < 1.3 && b.y < 1.1;
+        const header = lift > 0.85 && when < riseTime(lift - 0.55) + 0.04 && Math.abs(spot - bot.x) < 0.8;
+        const block = b.vx > 4 && b.y > HEAD_Y + HEAD_R + 0.1 && b.y < HEAD_Y + HEAD_R + 1.8 && -dx > 0.6 && -dx < 2.8;
+        const hop = behind && dx < 1.6 && b.y < 1.1;
         if ((header || block || hop) && chance(10, dt)) {
             out.jump = true;
             ai.jumpCool = 0.35;
@@ -693,9 +726,9 @@ const thinkBot = (g, dt) => {
     }
     // It picks its moment so the shot clears you and dips under the bar.
     const front = bot.x - b.x;
-    if (front > 0.05 && front < 1.15 && b.y - bot.y < 1.4) {
+    if (front > 0.2 && front < 1.2 && b.y - bot.y < 0.95) {
         const aim = b.y - bot.y < 0.7 ? shotReach(b.x, you) : null;
-        const ready = aim === null || Math.abs((front - 0.15) / 0.95 - aim) < 0.18 || front > 1;
+        const ready = aim === null || Math.abs(reachOf(front) - aim) < 0.18 || front > 1.05;
         if (ready && chance(9, dt)) out.kick = true;
     }
     return out;

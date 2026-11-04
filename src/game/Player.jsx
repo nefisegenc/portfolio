@@ -18,7 +18,6 @@ import {
     worldYaw,
 } from "../data/arcade";
 import { KartModel } from "./arcade/Props";
-import { kickAngle } from "./arcade/head/field";
 import { Blaster } from "./arcade/hunt/BugHunt";
 import { Guitar } from "./arcade/riff/Riff";
 import { arcadeLink, useArcade } from "./arcade/state";
@@ -41,12 +40,22 @@ const HUNT_SPEED_BOOST = 1.35;
 // and the arcade's high-score board.
 const cameraBlockers = [...landmarks.flatMap((l) => l.colliders), ...arcadeColliders].filter((c) => c.r > 1.5);
 
-const angleLerp = (from, to, t) => {
+// The shortest turn from one angle to another, between -π and π.
+const turnBetween = (from, to) => {
     let diff = to - from;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    return from + diff * t;
+    return diff;
 };
+
+const angleLerp = (from, to, t) => from + turnBetween(from, to) * t;
+
+// The follow camera swings round behind the character as it walks: quickest
+// when heading away from the camera, gently when walking sideways (so
+// sideways keys steer rather than spin), not at all when walking back
+// towards it. Looking around by hand pauses it for a moment.
+const FOLLOW_RATE = 1.2;
+const FOLLOW_PAUSE = 1.6;
 
 const damp = (lambda, dt) => 1 - Math.exp(-lambda * dt);
 
@@ -217,9 +226,6 @@ export const Player = () => {
             }
             moving = Math.hypot(s.vx, s.vz);
         }
-        // A game moving the player itself (Head to Head) says how they move.
-        const pose = arcadeLink.pose;
-        if (pose) moving = pose.speed;
         if (moving > 0.5 && canMove) store.markMoved();
 
         // Jump (the blaster's trigger shares the key, so not while hunting).
@@ -237,18 +243,18 @@ export const Player = () => {
 
         // Face the direction of travel, or the target while aiming (the kart steers itself).
         if (arcadeLink.aimYaw !== null && arcadeLink.aimYaw !== undefined) s.rotY = angleLerp(s.rotY, arcadeLink.aimYaw, damp(20, dt));
-        else if (!driving && !pose && moving > 0.3) s.rotY = angleLerp(s.rotY, Math.atan2(s.vx, s.vz), damp(12, dt));
+        else if (!driving && moving > 0.3) s.rotY = angleLerp(s.rotY, Math.atan2(s.vx, s.vz), damp(12, dt));
         group.current.rotation.y = s.rotY;
         // Blink for a moment after being hurt.
         arcadeLink.blink = Math.max(0, arcadeLink.blink - dt);
-        group.current.visible = !(arcadeLink.blink > 0 && Math.floor(clock.elapsedTime * 18) % 2 === 0);
+        group.current.visible = !arcadeLink.hide && !(arcadeLink.blink > 0 && Math.floor(clock.elapsedTime * 18) % 2 === 0);
 
         // Walk cycle
         const r = rig.current;
         const stride = Math.min(moving / WALK_SPEED, 1.6);
         s.phase += dt * (4 + moving * 1.6);
         const swing = Math.sin(s.phase) * 0.7 * Math.min(stride, 1.2);
-        const airborne = pose ? pose.air : s.y > 0.01;
+        const airborne = s.y > 0.01;
         // A footstep every half walk cycle.
         const stepIndex = Math.floor(s.phase / Math.PI);
         if (stepIndex !== s.stepIndex) {
@@ -270,7 +276,7 @@ export const Player = () => {
                 w.el.rotation.x = kart.wheel;
                 if (w.front) w.el.rotation.y = kart.steer * 0.45;
             }
-        } else if (r.leftLeg && !pose?.frozen) {
+        } else if (r.leftLeg) {
             r.leftLeg.rotation.x = MathUtils.lerp(r.leftLeg.rotation.x, airborne ? -0.5 : swing, damp(14, dt));
             r.rightLeg.rotation.x = MathUtils.lerp(r.rightLeg.rotation.x, airborne ? 0.3 : -swing, damp(14, dt));
             r.leftArm.rotation.x = MathUtils.lerp(r.leftArm.rotation.x, airborne ? -2.4 : -swing * 0.9, damp(12, dt));
@@ -295,18 +301,6 @@ export const Player = () => {
                 r.body.rotation.x = Math.sin(arcadeLink.beat * Math.PI * 2) * 0.05;
             } else if (r.rightArm.rotation.z !== 0.22) {
                 r.rightArm.rotation.z = 0.22;
-            }
-            // Head to Head: kicks swing the right leg through, and a force
-            // shot to the face rocks you back.
-            if (pose?.kick > 0) r.rightLeg.rotation.x = kickAngle(pose.kick);
-            if (pose?.stun) r.body.rotation.x = -0.55;
-        }
-        // Head to Head is played with a big head.
-        if (r.head) {
-            const big = arcade.active === "head" ? 1.75 : 1;
-            if (r.head.scale.x !== big) {
-                r.head.scale.setScalar(big);
-                r.head.position.y = 1.6 + (big - 1) * 0.2;
             }
         }
 
@@ -339,9 +333,16 @@ export const Player = () => {
 
         // Camera
         if (canMove) {
+            if (input.look.dx || input.look.dy) s.lookedAt = t;
             cameraState.yaw -= input.look.dx * 0.005;
             cameraState.pitch = MathUtils.clamp(cameraState.pitch + input.look.dy * 0.004, 0.05, 1.2);
             cameraState.distance = MathUtils.clamp(cameraState.distance + input.zoom, 4.5, 17);
+            if (moving > 0.5 && !arcade.active && t - (s.lookedAt ?? -FOLLOW_PAUSE) > FOLLOW_PAUSE) {
+                const diff = turnBetween(cameraState.yaw, s.rotY + Math.PI);
+                const ahead = MathUtils.clamp(Math.cos(diff) + 0.35, 0, 1);
+                const rate = Math.min(Math.abs(diff) * 1.6, FOLLOW_RATE) * ahead * Math.min(1, moving / WALK_SPEED);
+                cameraState.yaw += Math.sign(diff) * Math.min(Math.abs(diff), rate * dt);
+            }
         }
         input.look.dx = 0;
         input.look.dy = 0;

@@ -82,9 +82,9 @@ export const arcadeLink = {
     fret: null,
     strum: 0,
     beat: 0,
-    // How a game that moves the player itself wants them animated (Head to
-    // Head): { speed, air, kick (0–1 through a kick), stun, frozen }.
-    pose: null,
+    // Hides the player's avatar while a game draws them its own way (Head
+    // to Head's big heads).
+    hide: false,
 };
 
 const releasePlayer = () => {
@@ -101,7 +101,7 @@ const releasePlayer = () => {
     arcadeLink.push = null;
     arcadeLink.blink = 0;
     arcadeLink.snap = false;
-    arcadeLink.pose = null;
+    arcadeLink.hide = false;
 };
 
 let messageId = 0;

@@ -195,7 +195,7 @@ const ScoreCard = ({ active }) => {
 
     return (
         <motion.div
-            className="card pointer-events-auto fixed inset-x-3 top-[156px] z-20 flex items-center justify-between gap-4 py-2 pl-4 pr-2 md:inset-x-auto md:left-1/2 md:top-6 md:-translate-x-1/2"
+            className="card pointer-events-auto fixed inset-x-3 top-[156px] z-20 flex items-center justify-between gap-4 py-2 pl-4 pr-2 md:inset-x-auto md:left-1/2 md:top-6 md:-translate-x-1/2 [@media(max-height:520px)]:inset-x-auto [@media(max-height:520px)]:left-1/2 [@media(max-height:520px)]:top-2 [@media(max-height:520px)]:-translate-x-1/2"
             style={{ borderColor: game.color }}
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
