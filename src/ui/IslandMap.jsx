@@ -8,7 +8,7 @@ import {
     BOARD,
     BRIDGE_END,
     BRIDGE_START,
-    BUGS,
+    BUG_PORTAL,
     LANE,
     arcadePath,
     bridgeDir,
@@ -280,7 +280,7 @@ const ArcadeMap = ({ detailed, onSelect }) => {
                     stroke="#2A2340"
                     strokeWidth={0.3}
                 />
-                <circle cx={BUGS.x} cy={BUGS.z} r={BUGS.fence} fill="#B98C5A" />
+                <rect x={BUG_PORTAL.x - 2.2} y={BUG_PORTAL.z - 0.4} width={4.4} height={0.8} rx={0.4} fill="#EC4899" />
                 <rect x={BOARD.x - 1.7} y={BOARD.z - 0.3} width={3.4} height={0.6} rx={0.2} fill="#2A2340" />
             </g>
             {games.map((g) => (

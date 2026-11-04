@@ -11,7 +11,7 @@ const MUSIC = { bowling: bowlingMusic, race: raceMusic, bugs: huntMusic };
 // Games played under black light switch the island to night while they run.
 const NEON = new Set(["bowling", "bugs"]);
 // Games played away from the island, which take the player there and back.
-const AWAY = new Set(["race"]);
+const AWAY = new Set(["race", "bugs"]);
 let restoreDay = false;
 
 // v2: the race became a three-lap kart race, so older run times don't compare.
@@ -58,10 +58,12 @@ export const arcadeLink = {
     kart: null,
     // Live race readouts for the HUD: { speed, nitro, dots }.
     race: null,
-    // Where the hammer just landed in Bug Smash: { x, z }, read once.
-    hit: null,
-    // Bugs that are up right now, for the hammer's aim assist: [{ x, z }].
-    targets: [],
+    // Games on a raised floor, with their own edges: floor height and a
+    // function that pulls a position back inside.
+    floor: null,
+    bounds: null,
+    // Which way the player should face while aiming (Bug Hunt), or null.
+    aimYaw: null,
 };
 
 const releasePlayer = () => {
@@ -71,8 +73,9 @@ const releasePlayer = () => {
     arcadeLink.focus = null;
     arcadeLink.kart = null;
     arcadeLink.race = null;
-    arcadeLink.hit = null;
-    arcadeLink.targets = [];
+    arcadeLink.floor = null;
+    arcadeLink.bounds = null;
+    arcadeLink.aimYaw = null;
 };
 
 let messageId = 0;

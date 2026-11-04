@@ -79,7 +79,7 @@ const Progress = () => {
 };
 
 // During a game, small screens keep only the minimap so the score card fits;
-// the race, far from the islands, has its own map instead.
+// games played away from the islands hide it, the race showing its own.
 const TopRight = ({ helpOpen, onHelp, game }) => {
     const gameActive = Boolean(game);
     const openPanel = useStore((s) => s.openPanel);
@@ -95,7 +95,7 @@ const TopRight = ({ helpOpen, onHelp, game }) => {
             <button
                 onClick={() => openPanel({ type: "map" })}
                 aria-label={t("hud.openMap")}
-                className={`card relative aspect-square overflow-hidden rounded-full bg-[#BFE3F5] p-1.5 transition hover:scale-[1.03] ${game === "race" ? "invisible" : ""}`}
+                className={`card relative aspect-square overflow-hidden rounded-full bg-[#BFE3F5] p-1.5 transition hover:scale-[1.03] ${game === "race" || game === "bugs" ? "invisible" : ""}`}
             >
                 <IslandMap />
                 <span className="keycap absolute bottom-2 right-3 hidden md:inline-grid">M</span>
@@ -304,21 +304,19 @@ const Joystick = () => {
     );
 };
 
-// The right-hand button jumps, swings the hammer in Bug Smash, and goes
-// away in the kart, where the joystick does all the driving.
+// In a game the jump button gives way to the game's own action button.
 const MobileControls = ({ game }) => {
     const t = useT();
-    const hammer = game === "bugs";
     return (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 flex items-end justify-between px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <Joystick />
-            {game !== "race" && (
+            {!game && (
                 <button
-                    aria-label={hammer ? t("game.hit") : t("hud.jump")}
-                    className={`pointer-events-auto mb-4 grid h-16 w-16 touch-none place-items-center rounded-full border-[3px] border-white shadow-[0_4px_0_rgb(42_35_64/0.25)] active:translate-y-1 ${hammer ? "bg-[#22C55E] font-display text-lg font-extrabold text-white" : "bg-paper text-ink"}`}
+                    aria-label={t("hud.jump")}
+                    className="pointer-events-auto mb-4 grid h-16 w-16 touch-none place-items-center rounded-full border-[3px] border-white bg-paper text-ink shadow-[0_4px_0_rgb(42_35_64/0.25)] active:translate-y-1"
                     onPointerDown={() => (input.jump = true)}
                 >
-                    {hammer ? t("game.hit") : <ArrowUpIcon size={26} />}
+                    <ArrowUpIcon size={26} />
                 </button>
             )}
         </div>

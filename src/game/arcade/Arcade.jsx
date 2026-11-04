@@ -1,15 +1,16 @@
 import { ArcadeIsland } from "./ArcadeIsland";
 import { Bowling } from "./Bowling";
-import { BugSmash } from "./BugSmash";
+import { BugHunt } from "./hunt/BugHunt";
 import { Race } from "./race/Race";
 
-// The island and its games, plus the Sky Circuit, which floats off on its own.
+// The island with its bowling lane, plus the Sky Circuit and the Bug Hunt
+// arena, which float off on their own.
 export const Arcade = () => (
     <>
         <ArcadeIsland>
             <Bowling />
-            <BugSmash />
         </ArcadeIsland>
         <Race />
+        <BugHunt />
     </>
 );

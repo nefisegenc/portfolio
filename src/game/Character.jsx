@@ -132,7 +132,7 @@ const Leg = ({ side, rigRef }) => (
     </group>
 );
 
-// `tool` is something held in the right hand (the arcade's hammer).
+// `tool` is something held in the right hand (the arcade's blaster).
 export const Character = ({ rig, tool }) => {
     const set = (key) => (el) => {
         rig.current[key] = el;

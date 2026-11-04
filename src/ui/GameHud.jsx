@@ -112,11 +112,25 @@ const ScoreCard = ({ active }) => {
                 {detail && <Stat label={t("game.lapOf", { n: detail.lap, total: detail.laps })} value={`${time.toFixed(1)}s`} />}
             </>
         );
-    } else {
+    } else if (detail) {
         stats = (
             <>
-                <Stat label={t("game.timeLeft")} value={`${Math.ceil(time)}s`} color={time <= 5 ? "#EF4444" : undefined} />
+                <Stat label={t("game.wave")} value={`${detail.wave}/${detail.waves}`} />
                 <Stat label={t("game.score")} value={score} color={game.color} />
+                <Stat label={t("game.combo")} value={`x${detail.combo}`} color={detail.combo > 1 ? "#F59E0B" : undefined} />
+                <div className="w-24">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">{t("game.core")}</p>
+                    <div className="mt-1 h-3 overflow-hidden rounded-full bg-ink/10">
+                        <div
+                            className="h-full rounded-full transition-[width] duration-300"
+                            style={{ width: `${Math.round(detail.core * 100)}%`, background: detail.core > 0.5 ? "#22C55E" : detail.core > 0.25 ? "#F59E0B" : "#EF4444" }}
+                        />
+                    </div>
+                    <p className="mt-1 flex h-4 gap-1 text-[10px] font-extrabold uppercase">
+                        {detail.rapid && <span className="rounded bg-[#FACC15] px-1">{t("hunt.rapid")}</span>}
+                        {detail.triple && <span className="rounded bg-[#22D3EE] px-1">{t("hunt.triple")}</span>}
+                    </p>
+                </div>
             </>
         );
     }
@@ -136,7 +150,10 @@ const ScoreCard = ({ active }) => {
                 <p className="font-display text-lg font-extrabold leading-tight">{t(`game.${active}`)}</p>
             </div>
             {stats}
-            <Stat label={t("game.best")} value={best === undefined ? "–" : formatScore(active, best)} />
+            {/* The record stays off small screens to leave room for the game's own stats. */}
+            <div className="max-md:hidden">
+                <Stat label={t("game.best")} value={best === undefined ? "–" : formatScore(active, best)} />
+            </div>
             <button
                 onClick={quit}
                 className="icon-btn h-9 w-9"
@@ -212,6 +229,11 @@ const Results = ({ active, result }) => {
             </p>
             <p className="font-display text-sm font-bold text-ink-soft">{t("game.result")}</p>
             <p className="font-display text-6xl font-extrabold leading-none tabular-nums">{formatScore(active, result.score)}</p>
+            {result.extra?.wave && (
+                <p className="mt-1 font-display text-lg font-extrabold" style={{ color: result.extra.victory ? "#22C55E" : "#EF4444" }}>
+                    {result.extra.victory ? t("hunt.victory") : t("game.reachedWave", { n: result.extra.wave })}
+                </p>
+            )}
             {result.extra?.place && (
                 <p className="mt-1 font-display text-lg font-extrabold" style={{ color: game.color }}>
                     {t("game.finishedPlace", { place: t(`place.${result.extra.place}`) })}
@@ -267,9 +289,9 @@ const ActionButton = ({ color, children }) => {
             className="btn pointer-events-auto mb-1 h-16 touch-none px-7 text-lg"
             style={{ "--c": color }}
             onPointerDown={(e) => {
-                e.currentTarget.setPointerCapture(e.pointerId);
                 arcadeLink.action = true;
                 arcadeLink.holding = true;
+                e.currentTarget.setPointerCapture(e.pointerId);
             }}
             onPointerUp={release}
             onPointerCancel={release}
@@ -350,14 +372,12 @@ const RaceGauges = () => {
     );
 };
 
-const RaceTouch = () => {
-    const t = useT();
-    return (
-        <div className="pointer-events-none fixed bottom-0 right-0 z-10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-            <ActionButton color="#2563EB">{t("game.nitro")}</ActionButton>
-        </div>
-    );
-};
+// The game's action button on touch screens, beside the joystick.
+const TouchAction = ({ color, label }) => (
+    <div className="pointer-events-none fixed bottom-0 right-0 z-10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        <ActionButton color={color}>{label}</ActionButton>
+    </div>
+);
 
 const KEY_HELP = {
     bowling: [["←", "→"], ["key.space"]],
@@ -415,6 +435,7 @@ export const GameHud = () => {
     const active = useArcade((s) => s.active);
     const status = useArcade((s) => s.status);
     const result = useArcade((s) => s.result);
+    const t = useT();
     useGameKeys();
     return (
         <>
@@ -425,7 +446,8 @@ export const GameHud = () => {
             {active === "bowling" && status === "playing" && isTouch && <BowlingTouch />}
             {active === "bowling" && <PowerMeter />}
             {active === "race" && status !== "done" && <RaceGauges />}
-            {active === "race" && status === "playing" && isTouch && <RaceTouch />}
+            {active === "race" && status === "playing" && isTouch && <TouchAction color="#2563EB" label={t("game.nitro")} />}
+            {active === "bugs" && status === "playing" && isTouch && <TouchAction color="#22C55E" label={t("game.fire")} />}
             {active && status !== "done" && !isTouch && <KeyHelp active={active} />}
         </>
     );

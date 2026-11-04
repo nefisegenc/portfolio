@@ -305,15 +305,15 @@ const ScoreScreen = () => {
         <group position={[0, 2.35, -LANE.length + 0.25]}>
             <Box args={[SIDE_WALL * 2 + 0.5, 0.95, 0.12]} color="#0B0A14" />
             <Box args={[SIDE_WALL * 2 + 0.6, 0.05, 0.14]} position-y={0.5}>
-                <GlowMat color={PURPLE} strength={3} />
+                <GlowMat color={PURPLE} strength={1.6} />
             </Box>
             <Text font={FONT} fontSize={0.3} position={[0, 0.16, 0.07]} anchorY="middle">
                 {score === null ? t("game.bowling").toUpperCase() : `${score}`}
-                <GlowMat color={CYAN} strength={3} />
+                <GlowMat color={CYAN} strength={1.8} />
             </Text>
             <Text font={FONT} fontSize={0.13} position={[0, -0.22, 0.07]} anchorY="middle">
                 {frame ? t("game.frame", { n: frame, total: BOWLING_FRAMES }).toUpperCase() : "★ STRIKE ZONE ★"}
-                <GlowMat color="#F472B6" strength={2.5} />
+                <GlowMat color="#F472B6" strength={1.5} />
             </Text>
         </group>
     );
@@ -354,7 +354,7 @@ const LaneModel = () => {
                         </mesh>
                         <Box args={[0.2, 0.32, length]} position={[s * (SIDE_WALL + 0.1), 0.16, mid]} color="#1C1730" />
                         <Box args={[0.22, 0.05, length]} position={[s * (SIDE_WALL + 0.1), 0.34, mid]}>
-                            <GlowMat color={s < 0 ? PURPLE : CYAN} strength={2.4} />
+                            <GlowMat color={s < 0 ? PURPLE : CYAN} strength={1.3} />
                         </Box>
                         {/* Arches of neon over the lane */}
                         {[1.5, 4.5, 7.5].map((v) => (
@@ -366,7 +366,7 @@ const LaneModel = () => {
             </Shadowed>
             {[1.5, 4.5, 7.5].map((v, i) => (
                 <Box key={v} args={[SIDE_WALL * 2 + 0.82, 0.08, 0.12]} position={[0, 2.3, -v]}>
-                    <GlowMat color={i % 2 ? CYAN : "#F472B6"} strength={2.6} />
+                    <GlowMat color={i % 2 ? CYAN : "#F472B6"} strength={1.4} />
                 </Box>
             ))}
             {/* Pin deck back wall and masking unit */}
@@ -376,7 +376,7 @@ const LaneModel = () => {
             </Shadowed>
             <Text font={FONT} fontSize={0.26} position={[0, 1.55, -length + 0.56]} anchorY="middle">
                 {t("game.bowling").toUpperCase()}
-                <GlowMat color={PURPLE} strength={3} />
+                <GlowMat color={PURPLE} strength={1.6} />
             </Text>
             <ScoreScreen />
         </group>

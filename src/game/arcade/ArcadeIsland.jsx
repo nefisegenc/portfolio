@@ -14,6 +14,7 @@ import {
     BRIDGE_END,
     BRIDGE_HALF_WIDTH,
     BRIDGE_START,
+    BUG_PORTAL,
     ENTRY,
     PAD_RADIUS,
     PARKED_KART,
@@ -296,6 +297,36 @@ const RaceCorner = () => {
     );
 };
 
+// Bug Hunt's way in: a neon hexagon with a swirling core, standing open.
+const BugPortal = () => {
+    const t = useT();
+    const swirl = useRef();
+    useFrame(({ clock }) => (swirl.current.rotation.z = clock.elapsedTime * 1.6));
+    return (
+        <group position={[BUG_PORTAL.x, 0, BUG_PORTAL.z]}>
+            <Shadowed>
+                {[-1, 1].map((s) => (
+                    <Box key={s} args={[0.35, 3.6, 0.35]} position={[s * 1.9, 1.8, 0]} color="#1C1730" />
+                ))}
+            </Shadowed>
+            <group position-y={1.9}>
+                <mesh rotation-z={Math.PI / 6}>
+                    <torusGeometry args={[1.55, 0.13, 8, 6]} />
+                    <GlowMat color="#22C55E" strength={3} />
+                </mesh>
+                <mesh ref={swirl}>
+                    <circleGeometry args={[1.45, 6]} />
+                    <meshBasicMaterial color="#7C3AED" transparent opacity={0.6} toneMapped={false} />
+                </mesh>
+            </group>
+            <Text font={FONT} fontSize={0.42} position={[0, 4, 0]} anchorY="middle">
+                {t("game.bugs").toUpperCase()}
+                <GlowMat color="#22C55E" strength={2.6} />
+            </Text>
+        </group>
+    );
+};
+
 // Children are placed in arcade space.
 export const ArcadeIsland = ({ children }) => (
     <>
@@ -308,6 +339,7 @@ export const ArcadeIsland = ({ children }) => (
             <Arch />
             <ScoreBoard />
             <RaceCorner />
+            <BugPortal />
             {games.map((g) => (
                 <Pad key={g.id} game={g} />
             ))}

@@ -1,6 +1,6 @@
 // Third-person controller: movement relative to the camera, collisions,
 // jumping, walk animation, proximity to landmarks and the follow camera.
-// In the arcade the player can also drive the race kart or swing a hammer.
+// In the arcade the player can also sit in the race kart or carry a blaster.
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { MathUtils, Vector3 } from "three";
@@ -16,7 +16,8 @@ import {
     toWorld,
     worldYaw,
 } from "../data/arcade";
-import { Hammer, KartModel } from "./arcade/Props";
+import { KartModel } from "./arcade/Props";
+import { Blaster } from "./arcade/hunt/BugHunt";
 import { arcadeLink, useArcade } from "./arcade/state";
 import { Character } from "./Character";
 import { colliders } from "./scenery";
@@ -28,16 +29,10 @@ const RUN_SPEED = 8.2;
 const PLAYER_RADIUS = 0.35;
 const GRAVITY = 22;
 const JUMP_VELOCITY = 7;
-// Bug Smash is played on foot but quicker.
-const HAMMER_SPEED_BOOST = 1.4;
+// Bug Hunt is played on foot but quicker.
+const HUNT_SPEED_BOOST = 1.35;
 
 
-// Hammer swing timeline in seconds: wind up, strike (the hit lands at its
-// end), recover. Angles are how far the arm swings forward.
-const SWING = { windUp: 0.08, strike: 0.16, end: 0.34 };
-const ARM = { rest: 0.35, raised: 2.7, struck: 0.45 };
-const HAMMER_REACH = 0.55;
-const AIM_ASSIST = 1.3;
 
 // Buildings the camera must not sink into (trees are small enough to ignore).
 const cameraBlockers = landmarks.flatMap((l) => l.colliders.filter((c) => c.r > 1.5));
@@ -67,7 +62,8 @@ const resolveCollisions = (pos, radius = PLAYER_RADIUS) => {
         }
     }
     const { x, z } = pos;
-    clampToWalkable(pos);
+    // Games away from the islands bring their own edges.
+    (arcadeLink.bounds ?? clampToWalkable)(pos);
     return hit || x !== pos.x || z !== pos.z;
 };
 
@@ -172,7 +168,7 @@ export const Player = () => {
         }
 
         const driving = arcade.active === "race";
-        const hammer = arcade.active === "bugs";
+        const hunting = arcade.active === "bugs";
 
         let moving;
         if (driving) {
@@ -194,7 +190,7 @@ export const Player = () => {
             const yaw = cameraState.yaw;
             const mx = Math.sin(yaw) * iz + Math.cos(yaw) * ix;
             const mz = Math.cos(yaw) * iz - Math.sin(yaw) * ix;
-            const speed = (input.run ? RUN_SPEED : WALK_SPEED) * (hammer ? HAMMER_SPEED_BOOST : 1);
+            const speed = (input.run ? RUN_SPEED : WALK_SPEED) * (hunting ? HUNT_SPEED_BOOST : 1);
             s.vx = MathUtils.lerp(s.vx, mx * speed, damp(12, dt));
             s.vz = MathUtils.lerp(s.vz, mz * speed, damp(12, dt));
             // Sub-step so a long frame can't tunnel through thin colliders.
@@ -208,42 +204,22 @@ export const Player = () => {
         }
         if (moving > 0.5 && canMove) store.markMoved();
 
-        // Jump, or with the hammer in hand, swing it.
-        if (input.jump && canMove && hammer) {
-            if (!(s.swing >= 0)) {
-                s.swing = 0;
-                // Aim assist: turn to the nearest bug in reach.
-                let best = AIM_ASSIST;
-                for (const b of arcadeLink.targets) {
-                    const d = Math.hypot(b.x - pos.x, b.z - pos.z);
-                    if (d < best) {
-                        best = d;
-                        s.rotY = Math.atan2(b.x - pos.x, b.z - pos.z);
-                    }
-                }
-            }
-        } else if (input.jump && canMove && !driving && s.y === 0) {
+        // Jump (the blaster's trigger shares the key, so not while hunting).
+        if (input.jump && canMove && !driving && !hunting && s.y === 0) {
             s.vy = JUMP_VELOCITY;
             playSound("jump");
         }
         input.jump = false;
-        if (s.swing >= 0) {
-            const before = s.swing;
-            s.swing += dt;
-            if (before < SWING.strike && s.swing >= SWING.strike) {
-                arcadeLink.hit = { x: pos.x + Math.sin(s.rotY) * HAMMER_REACH, z: pos.z + Math.cos(s.rotY) * HAMMER_REACH };
-            }
-            if (s.swing > SWING.end || !hammer) s.swing = -1;
-        }
         s.vy -= GRAVITY * dt;
         s.y = Math.max(0, s.y + s.vy * dt);
         if (s.y === 0) s.vy = 0;
-        pos.y = lock?.y ?? s.y;
+        pos.y = lock?.y ?? (arcadeLink.floor ?? 0) + s.y;
         tilt.current.rotation.x = lock?.pitch ?? 0;
         tilt.current.rotation.z = lock?.roll ?? 0;
 
-        // Face the direction of travel (the kart steers itself; a swing holds its aim).
-        if (!driving && !(s.swing >= 0) && moving > 0.3) s.rotY = angleLerp(s.rotY, Math.atan2(s.vx, s.vz), damp(12, dt));
+        // Face the direction of travel, or the target while aiming (the kart steers itself).
+        if (arcadeLink.aimYaw !== null && arcadeLink.aimYaw !== undefined) s.rotY = angleLerp(s.rotY, arcadeLink.aimYaw, damp(20, dt));
+        else if (!driving && moving > 0.3) s.rotY = angleLerp(s.rotY, Math.atan2(s.vx, s.vz), damp(12, dt));
         group.current.rotation.y = s.rotY;
 
         // Walk cycle
@@ -280,17 +256,10 @@ export const Player = () => {
             r.rightArm.rotation.x = MathUtils.lerp(r.rightArm.rotation.x, airborne ? -2.4 : swing * 0.9, damp(12, dt));
             r.body.position.y = airborne ? 0 : Math.abs(Math.sin(s.phase)) * 0.06 * Math.min(stride, 1) + Math.sin(t * 2) * 0.008;
             r.body.rotation.x = MathUtils.lerp(r.body.rotation.x, stride * 0.08, damp(8, dt));
-            if (hammer) {
-                // The hammer arm: resting forward, or following the swing.
-                let reach = ARM.rest;
-                if (s.swing >= 0) {
-                    const p = s.swing;
-                    if (p < SWING.windUp) reach = MathUtils.lerp(ARM.rest, ARM.raised, p / SWING.windUp);
-                    else if (p < SWING.strike) reach = MathUtils.lerp(ARM.raised, ARM.struck, (p - SWING.windUp) / (SWING.strike - SWING.windUp));
-                    else reach = MathUtils.lerp(ARM.struck, ARM.rest, (p - SWING.strike) / (SWING.end - SWING.strike));
-                    r.body.rotation.x = p > SWING.windUp && p < SWING.end ? 0.22 : r.body.rotation.x;
-                }
-                r.rightArm.rotation.x = -reach;
+            if (hunting) {
+                // Blaster held out in front.
+                r.rightArm.rotation.x = -1.45;
+                r.leftArm.rotation.x = MathUtils.lerp(r.leftArm.rotation.x, -1.1, damp(12, dt));
             }
         }
 
@@ -386,7 +355,7 @@ export const Player = () => {
             <Controls />
             <group ref={group}>
                 <group ref={tilt} rotation-order="YXZ">
-                    <Character rig={rig} tool={game === "bugs" ? <Hammer /> : null} />
+                    <Character rig={rig} tool={game === "bugs" ? <Blaster /> : null} />
                     {game === "race" && <KartModel wheels={wheels} position-z={0.12} />}
                 </group>
                 <mesh position-y={0.02} rotation-x={-Math.PI / 2}>

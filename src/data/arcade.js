@@ -110,22 +110,13 @@ export const LANE = {
     length: 10.2,
 };
 
-export const BUGS = {
-    x: 5.6,
-    z: -1.2,
-    spacing: 1.8,
-    fence: 3.1,
-    duration: 30,
-};
-export const bugHoles = Array.from({ length: 9 }, (_, i) => ({
-    x: BUGS.x + ((i % 3) - 1) * BUGS.spacing,
-    z: BUGS.z + (Math.floor(i / 3) - 1) * BUGS.spacing,
-}));
+// Bug Hunt's portal on the island: step through it to the arena.
+export const BUG_PORTAL = { x: 5.6, z: -0.6 };
 
 export const games = [
     { id: "bowling", color: "#8B5CF6", pad: { x: LANE.x, z: LANE.foulZ + 2.3 } },
     { id: "race", color: "#F97316", pad: { x: 2.4, z: 7.9 } },
-    { id: "bugs", color: "#22C55E", pad: { x: BUGS.x, z: BUGS.z + BUGS.fence + 1.2 } },
+    { id: "bugs", color: "#22C55E", pad: { x: BUG_PORTAL.x, z: BUG_PORTAL.z + 3.2 } },
 ].map((g) => {
     const [x, z] = toWorld(g.pad.x, g.pad.z);
     return { ...g, x, z };
@@ -169,11 +160,7 @@ const local = [
         r: 0.3,
     }))).flat(),
     ...[-1, 0, 1].map((s) => ({ x: LANE.x + s * 0.8, z: LANE.foulZ - LANE.length - 0.2, r: 0.55 })),
-    // A rope fence around the bug field, open towards its pad.
-    ...Array.from({ length: 14 }, (_, i) => {
-        const a = (i / 16) * Math.PI * 2 + Math.PI / 8 + Math.PI / 16;
-        return { x: BUGS.x + Math.sin(a) * BUGS.fence, z: BUGS.z + Math.cos(a) * BUGS.fence, r: 0.18 };
-    }),
+    ...[-1, 1].map((s) => ({ x: BUG_PORTAL.x + s * 1.9, z: BUG_PORTAL.z, r: 0.35 })),
     { x: PARKED_KART.x, z: PARKED_KART.z, r: 0.75 },
     { x: RACE_SIGN.x, z: RACE_SIGN.z, r: 0.4 },
 ];

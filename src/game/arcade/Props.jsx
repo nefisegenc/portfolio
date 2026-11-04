@@ -1,4 +1,4 @@
-// Props the player uses in the arcade: the race kart and the squeaky hammer.
+// Props for the arcade's race: the kart and the rivals who drive one.
 import { Box, Cyl, Shadowed } from "../parts";
 
 const BODY = "#F97316";
@@ -70,19 +70,5 @@ export const Driver = ({ color }) => (
             <sphereGeometry args={[0.16, 14, 10]} />
             <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.4} />
         </mesh>
-    </group>
-);
-
-// A toy mallet held in the hand: the handle hangs on from the arm, the head
-// sits across its end. Drawn in the arm's space (shoulder at the origin).
-export const Hammer = () => (
-    <group>
-        <Cyl args={[0.024, 0.024, 0.58, 6]} position={[0, -0.74, 0]} color="#FACC15" />
-        <group position={[0, -1.06, 0]} rotation-x={Math.PI / 2}>
-            <Cyl args={[0.11, 0.11, 0.28, 14]} color="#EF4444" />
-            {[-0.15, 0.15].map((y) => (
-                <Cyl key={y} args={[0.115, 0.115, 0.03, 14]} position-y={y} color="#FACC15" />
-            ))}
-        </group>
     </group>
 );
