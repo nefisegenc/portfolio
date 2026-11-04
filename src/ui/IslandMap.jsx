@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { ISLAND_RADIUS, PLAZA_RADIUS, landmarks, paths } from "../data/world";
 import {
     ARCADE,
-    ARCADE_COLOR,
     ARCADE_RADIUS,
     BOARD,
     BRIDGE_END,
@@ -20,8 +19,8 @@ import { formatScore } from "../game/arcade/format";
 import { useArcade } from "../game/arcade/state";
 import { playerState } from "../game/input";
 import { useStore } from "../store";
-import { landmarkLabel, translate, useLang, useT } from "../i18n";
-import { CloseIcon } from "./icons";
+import { landmarkLabel, useLang, useT } from "../i18n";
+import { CloseIcon, GamepadIcon } from "./icons";
 
 const outline = (radius) => {
     const points = [];
@@ -34,9 +33,6 @@ const outline = (radius) => {
 };
 
 const MARKER_R = 3.1;
-// The arcade sits off the edge of the main map: a marker on its bridge.
-const [ARCADE_MARK_X, ARCADE_MARK_Z] = bridgePoint(28.4);
-const arcadeMarker = { id: "arcade", x: ARCADE_MARK_X, z: ARCADE_MARK_Z };
 
 const LABEL_SIZE = 2.3;
 const LABEL_H = 2.5;
@@ -87,11 +83,11 @@ const placeLabels = (lang) => {
         b.y0 > -MAP_EDGE &&
         b.y1 < MAP_EDGE &&
         !touchesCircle(b, 0, 0, PLAZA_RADIUS + 0.4) &&
-        ![...landmarks, arcadeMarker].some((m) => touchesCircle(b, m.x, m.z, MARKER_R + 0.25)) &&
+        !landmarks.some((m) => touchesCircle(b, m.x, m.z, MARKER_R + 0.25)) &&
         !placed.some((p) => overlaps(b, p));
     return Object.fromEntries(
-        [...landmarks, arcadeMarker].map((l) => {
-            const text = l.id === "arcade" ? translate(lang, "arcade.name") : l.shortLabel ?? landmarkLabel(l, lang);
+        landmarks.map((l) => {
+            const text = l.shortLabel ?? landmarkLabel(l, lang);
             const spots = labelSpots(l, labelWidth(text));
             const spot = spots.find(free) ?? spots[0];
             placed.push(spot);
@@ -152,16 +148,6 @@ const Marker = ({ x, z, r, color, onSelect, children }) => (
     >
         <circle r={r} fill={color} stroke="#fff" strokeWidth={r * 0.26} />
         {children}
-    </g>
-);
-
-// A small gamepad drawn in marker space (radius 1).
-const GamepadGlyph = ({ r }) => (
-    <g transform={`scale(${r / 12})`} fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-        <g transform="translate(-12 -12)">
-            <path d="M6 9h4M8 7v4M15 10h.01M18 8h.01" />
-            <path d="M17.3 5H6.7a4 4 0 0 0-3.96 3.43l-.7 4.9A2.6 2.6 0 0 0 6.6 15.2L8.5 13h7l1.9 2.2a2.6 2.6 0 0 0 4.56-1.87l-.7-4.9A4 4 0 0 0 17.3 5Z" />
-        </g>
     </g>
 );
 
@@ -230,16 +216,6 @@ const MainMap = ({ detailed, onSelect }) => {
                     </g>
                 );
             })}
-            <Marker
-                x={arcadeMarker.x}
-                z={arcadeMarker.z}
-                r={detailed ? 3.1 : 2.7}
-                color={ARCADE_COLOR}
-                onSelect={onSelect ? () => onSelect("arcade") : undefined}
-            >
-                <GamepadGlyph r={detailed ? 2.2 : 1.9} />
-            </Marker>
-            {detailed && <MapLabel x={arcadeMarker.x + labels.arcade.x} y={arcadeMarker.z + labels.arcade.y}>{labels.arcade.text}</MapLabel>}
             <PlayerArrow />
         </svg>
     );
@@ -331,6 +307,26 @@ const PlaceButton = ({ color, label, note, onClick }) => (
     </li>
 );
 
+// Game mode, offered at the top of the island's places.
+const GameModeCard = () => {
+    const openMenu = useArcade((s) => s.openMenu);
+    const t = useT();
+    return (
+        <button
+            onClick={openMenu}
+            className="mb-3 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-white shadow-[0_4px_0_#831843] transition hover:-translate-y-0.5 active:translate-y-0.5"
+            style={{ background: "linear-gradient(120deg, #EC4899, #8B5CF6)" }}
+        >
+            <GamepadIcon size={26} />
+            <span className="flex-1">
+                <span className="block font-display text-lg font-extrabold leading-tight">{t("mode.games")}</span>
+                <span className="block text-xs font-bold text-white/85">{t("arcade.menuLead")}</span>
+            </span>
+            <span className="rounded-full bg-white/20 px-2.5 py-1 text-xs font-extrabold">{t("map.games")}</span>
+        </button>
+    );
+};
+
 const IslandPlaces = ({ onSelect }) => {
     const discovered = useStore((s) => s.discovered);
     const lang = useLang();
@@ -349,7 +345,6 @@ const IslandPlaces = ({ onSelect }) => {
                     />
                 );
             })}
-            <PlaceButton color={ARCADE_COLOR} label={t("arcade.title")} note={t("map.games")} onClick={() => onSelect("arcade")} />
         </>
     );
 };
@@ -426,6 +421,7 @@ export const MapOverlay = () => {
                         {view === "arcade" ? t("arcade.title") : t("map.title")}
                     </h2>
                     <p className="mb-4 text-sm font-semibold text-ink-soft">{view === "arcade" ? t("arcade.intro") : t("map.pick")}</p>
+                    {view === "main" && <GameModeCard />}
                     <ul className="grid gap-2">
                         {view === "arcade" ? <ArcadePlaces onSelect={travelTo} /> : <IslandPlaces onSelect={travelTo} />}
                     </ul>

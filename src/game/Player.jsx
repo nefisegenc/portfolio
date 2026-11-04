@@ -350,10 +350,11 @@ export const Player = () => {
         const own = arcadeLink.camera;
         if (own) {
             const k = own.stiffness ?? 4;
-            if (s.snapCamera) {
+            if (s.snapCamera || arcadeLink.snap) {
                 camera.position.copy(own.position);
                 tmp.look.copy(own.target);
                 s.snapCamera = false;
+                arcadeLink.snap = false;
             }
             camera.position.lerp(own.position, damp(k, dt));
             tmp.look.lerp(own.target, damp(k * 1.25, dt));

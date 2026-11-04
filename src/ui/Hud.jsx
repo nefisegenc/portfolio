@@ -15,6 +15,7 @@ import {
     ArrowUpIcon,
     Avatar,
     CloseIcon,
+    GamepadIcon,
     GridIcon,
     HelpIcon,
     MapIcon,
@@ -95,7 +96,7 @@ const TopRight = ({ helpOpen, onHelp, game }) => {
             <button
                 onClick={() => openPanel({ type: "map" })}
                 aria-label={t("hud.openMap")}
-                className={`card relative aspect-square overflow-hidden rounded-full bg-[#BFE3F5] p-1.5 transition hover:scale-[1.03] ${game === "race" || game === "bugs" ? "invisible" : ""}`}
+                className={`card relative aspect-square overflow-hidden rounded-full bg-[#BFE3F5] p-1.5 transition hover:scale-[1.03] ${game === "race" || game === "bugs" || game === "riff" ? "invisible" : ""}`}
             >
                 <IslandMap />
                 <span className="keycap absolute bottom-2 right-3 hidden md:inline-grid">M</span>
@@ -201,6 +202,39 @@ const InteractPrompt = () => {
     );
 };
 
+// Portfolio or game mode: a switch that's always in reach. Game mode means
+// the arcade island (or a game under way); switching to it opens the menu.
+const ModeSwitch = () => {
+    const gameMode = useArcade((s) => s.area === "arcade" || Boolean(s.active));
+    const enter = useArcade((s) => s.enterGameMode);
+    const leave = useArcade((s) => s.leaveGameMode);
+    const t = useT();
+    const base = "flex items-center gap-1.5 rounded-[14px] px-3 py-2 font-display text-sm font-bold transition md:px-3.5";
+    return (
+        <div role="radiogroup" aria-label={t("mode.label")} className="card pointer-events-auto flex gap-1 p-1">
+            <button
+                role="radio"
+                aria-checked={!gameMode}
+                onClick={gameMode ? leave : undefined}
+                className={`${base} ${gameMode ? "text-ink-soft hover:bg-ink/5" : "bg-ink text-white"}`}
+            >
+                {t("mode.portfolio")}
+            </button>
+            <button
+                role="radio"
+                aria-checked={gameMode}
+                onClick={enter}
+                className={`${base} ${gameMode ? "text-white shadow-[0_3px_0_#9D174D]" : "text-[#DB2777] hover:bg-[#EC4899]/10"}`}
+                style={gameMode ? { background: "linear-gradient(120deg, #EC4899, #8B5CF6)" } : undefined}
+            >
+                <GamepadIcon size={18} />
+                {t("mode.games")}
+                {!gameMode && <span className="keycap ml-0.5 hidden md:inline-grid">G</span>}
+            </button>
+        </div>
+    );
+};
+
 const KEYS = [
     [["W", "A", "S", "D"], "controls.move"],
     [["Shift"], "controls.run"],
@@ -209,6 +243,7 @@ const KEYS = [
     [["E"], "controls.enter"],
     [["M"], "controls.map"],
     [["N"], "controls.night"],
+    [["G"], "controls.games"],
 ];
 
 // Bottom-left on desktop; on narrow windows it drops down under the buttons.
@@ -348,8 +383,11 @@ export const Hud = () => {
     return (
         <motion.div className="pointer-events-none fixed inset-0 z-10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
             <div className="flex items-start justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:p-6">
-                <div className="pointer-events-auto">
-                    <PlayerBadge />
+                <div className="flex flex-col items-start gap-2 md:flex-row md:items-center md:gap-3">
+                    <div className="pointer-events-auto">
+                        <PlayerBadge />
+                    </div>
+                    {!game && <ModeSwitch />}
                 </div>
                 <TopRight helpOpen={helpOpen} onHelp={() => toggleHelp(!helpOpen)} game={game} />
             </div>

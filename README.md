@@ -8,7 +8,7 @@ Interactive portfolio of Nefise Nur Genç, front-end developer. Visitors walk ar
 - A landmark for each project, each opening a project panel
 - Discovery tracker with an achievement once every project is found
 - Minimap and a full map with fast travel
-- An arcade island across a rope bridge with four games and saved high scores, each with its own synthesised soundtrack:
+- A game mode (switch in the HUD, a button on the title screen, or G) with a menu of four games playable from anywhere, each with its own synthesised soundtrack and saved high scores; the games also live on an arcade island across a rope bridge:
   - Cosmic bowling: five frames with real scoring, a power gauge, hook and a pin cam
   - Sky GP: a three-lap kart race on a floating circuit with jumps, obstacles, nitro and three rivals
   - Bug Hunt: a twin-stick wave shooter in a neon server room, defending the core (and yourself) from five waves of bugs and a boss

@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { useStore } from "../store";
+import { useArcade } from "../game/arcade/state";
 import { isTouch } from "../game/utils";
 import { usePersonal, useT } from "../i18n";
-import { GridIcon, PlayIcon } from "./icons";
+import { GamepadIcon, GridIcon, PlayIcon } from "./icons";
 import { LangToggle } from "./LangToggle";
 
 export const TitleScreen = () => {
@@ -10,6 +11,7 @@ export const TitleScreen = () => {
     const ready = useStore((s) => s.sceneReady);
     const start = useStore((s) => s.start);
     const openQuickView = useStore((s) => s.openQuickView);
+    const enterGameMode = useArcade((s) => s.enterGameMode);
     const t = useT();
     const personal = usePersonal();
     const shown = ready ? 100 : Math.min(progress, 97);
@@ -62,6 +64,13 @@ export const TitleScreen = () => {
                         >
                             <button autoFocus onClick={start} className="btn px-7 py-4 text-xl" style={{ "--c": "#F07A4A" }}>
                                 <PlayIcon size={20} /> {t("title.start")}
+                            </button>
+                            <button
+                                onClick={enterGameMode}
+                                className="btn py-4"
+                                style={{ "--c": "#DB2777", background: "linear-gradient(120deg, #EC4899, #8B5CF6)" }}
+                            >
+                                <GamepadIcon size={20} /> {t("title.games")}
                             </button>
                             <button onClick={openQuickView} className="btn btn-ghost py-4">
                                 <GridIcon size={18} /> {t("title.quick")}

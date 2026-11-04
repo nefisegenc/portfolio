@@ -48,6 +48,9 @@ export const arcadeLink = {
     camera: null,
     // One-off move: { x, z, rotY }.
     teleport: null,
+    // Set when a game is started from the menu, so the camera cuts straight
+    // to the game's own view instead of sweeping over from wherever it was.
+    snap: false,
     // The action button (Space, Enter or the touch button): `action` is set on
     // each press until a game reads it, `holding` while it is held down.
     action: false,
@@ -94,6 +97,7 @@ const releasePlayer = () => {
     arcadeLink.aimStick = null;
     arcadeLink.push = null;
     arcadeLink.blink = 0;
+    arcadeLink.snap = false;
 };
 
 let messageId = 0;
@@ -142,6 +146,36 @@ export const useArcade = create((set, get) => ({
             message: null,
             result: null,
         });
+    },
+    // Game mode: the game menu opens from anywhere, and choosing a game
+    // starts it straight away, wherever the player is (each game takes the
+    // player where it's played).
+    openMenu: () => useStore.getState().openPanel({ type: "arcade" }),
+    play: (id) => {
+        const island = useStore.getState();
+        island.closePanel();
+        // A quick fade hides the jump.
+        useStore.setState({ flash: island.flash + 1 });
+        if (get().active) get().quit();
+        arcadeLink.snap = true;
+        get().start(id);
+    },
+    // Into game mode: over to the arcade island with the menu open. Out of
+    // it: back to the plaza.
+    enterGameMode: () => {
+        const island = useStore.getState();
+        if (island.phase !== "playing") island.start();
+        if (get().active) get().quit();
+        if (get().area === "arcade") {
+            get().openMenu();
+            return;
+        }
+        useStore.getState().travelTo("arcade");
+        setTimeout(() => get().openMenu(), 550);
+    },
+    leaveGameMode: () => {
+        if (get().active) get().quit();
+        useStore.getState().travelTo("plaza");
     },
     quit: () => {
         const { active } = get();
