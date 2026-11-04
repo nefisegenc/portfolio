@@ -14,8 +14,9 @@ const NEON = new Set(["bowling", "bugs"]);
 const AWAY = new Set(["race", "bugs"]);
 let restoreDay = false;
 
-// v2: the race became a three-lap kart race, so older run times don't compare.
-const BEST_KEY = "nefise-island:arcade-best-v2";
+// Bumped whenever a game's scoring changes so old records don't carry over
+// (v3: five-frame bowling, the Sky Circuit and Bug Hunt).
+const BEST_KEY = "nefise-island:arcade-best-v3";
 
 const loadBest = () => {
     try {
