@@ -112,12 +112,12 @@ const Clouds = () => {
     const ref = useRef();
     useFrame(({ camera }, dt) => {
         ref.current.rotation.y += dt * 0.006;
-        // Head to Head's camera sits out in the ring the clouds drift round,
-        // so during a match any cloud drifting near it steps aside rather
-        // than covering the pitch.
-        const match = useArcade.getState().active === "head";
+        // The games played off the islands sit out in the ring the clouds
+        // drift round, so while one is on any cloud drifting near the camera
+        // steps aside rather than covering the view.
+        const playing = Boolean(useArcade.getState().active);
         for (const cloud of ref.current.children) {
-            cloud.visible = !match || cloud.getWorldPosition(cloudSpot).distanceTo(camera.position) > 40;
+            cloud.visible = !playing || cloud.getWorldPosition(cloudSpot).distanceTo(camera.position) > 40;
         }
     });
     return (
