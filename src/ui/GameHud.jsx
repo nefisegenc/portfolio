@@ -1,8 +1,9 @@
 // HUD for the arcade games: score card, countdown, pop-up messages, the
 // results card and touch buttons for bowling.
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { getGame } from "../data/arcade";
+import { BOWLING_FRAMES, frameTotals, rollMarks } from "../game/arcade/bowlingScore";
 import { formatScore } from "../game/arcade/format";
 import { arcadeLink, useArcade } from "../game/arcade/state";
 import { input } from "../game/input";
@@ -19,30 +20,64 @@ const Stat = ({ label, value, color }) => (
     </div>
 );
 
-// Strike "X", spare "/", a dash for a miss, as on a bowling score sheet.
-const rollMarks = (rolls = []) =>
-    rolls.map((n, i) => {
-        if (i === 0 && n === 10) return "X";
-        if (i === 1 && rolls[0] + n === 10) return "/";
-        return n === 0 ? "–" : String(n);
-    });
+// A score sheet: each frame's marks over its running total.
+const BowlingSheet = ({ detail }) => {
+    const totals = frameTotals(detail.frames);
+    return (
+        <div className="flex gap-1">
+            {Array.from({ length: BOWLING_FRAMES }, (_, i) => {
+                const last = i === BOWLING_FRAMES - 1;
+                const marks = rollMarks(detail.frames[i], last);
+                const current = i === detail.frame - 1;
+                return (
+                    <div
+                        key={i}
+                        className={`flex min-w-9 flex-col items-center rounded-lg border-2 px-1 font-display leading-tight ${current ? "border-[#8B5CF6] bg-[#8B5CF6]/10" : "border-line bg-white/70"} ${last ? "min-w-12" : ""}`}
+                    >
+                        <span className="flex h-4 gap-1 text-[11px] font-extrabold">
+                            {marks.length ? marks.map((m, j) => <span key={j}>{m}</span>) : <span className="text-ink-soft/40">·</span>}
+                        </span>
+                        <span className="text-sm font-extrabold tabular-nums">{totals[i] ?? "\u00A0"}</span>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
 
-const BowlingSheet = ({ detail }) => (
-    <div className="flex gap-1">
-        {Array.from({ length: detail.frames }, (_, i) => {
-            const marks = rollMarks(detail.rolls[i]);
-            const current = i === detail.frame - 1;
-            return (
-                <div
-                    key={i}
-                    className={`flex h-7 min-w-11 items-center justify-center gap-1 rounded-lg border-2 px-1.5 font-display text-sm font-extrabold ${current ? "border-[#8B5CF6] bg-[#8B5CF6]/10" : "border-line bg-white/70"}`}
-                >
-                    {marks.length ? marks.map((m, j) => <span key={j}>{m}</span>) : <span className="text-ink-soft/40">·</span>}
-                </div>
-            );
-        })}
-    </div>
-);
+// Bowling's power gauge, redrawn every frame straight from the game.
+const PowerMeter = () => {
+    const box = useRef();
+    const fill = useRef();
+    const t = useT();
+    useEffect(() => {
+        let frame;
+        const tick = () => {
+            const value = arcadeLink.meter;
+            if (box.current) {
+                box.current.style.opacity = value === null ? "0" : "1";
+                if (value !== null) {
+                    fill.current.style.height = `${Math.round(value * 100)}%`;
+                    fill.current.style.background = value > 0.85 ? "#EF4444" : value > 0.55 ? "#FACC15" : "#22D3EE";
+                }
+            }
+            frame = requestAnimationFrame(tick);
+        };
+        tick();
+        return () => cancelAnimationFrame(frame);
+    }, []);
+    return (
+        <div
+            ref={box}
+            className="card pointer-events-none fixed left-6 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-2 px-2 py-3 opacity-0 transition-opacity max-md:left-3"
+        >
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">{t("game.power")}</p>
+            <div className="relative h-40 w-5 overflow-hidden rounded-full bg-ink/10">
+                <div ref={fill} className="absolute inset-x-0 bottom-0 rounded-full" />
+            </div>
+        </div>
+    );
+};
 
 // Takes the game as a prop so it can still render while animating out
 // after the store has already cleared the game.
@@ -63,7 +98,7 @@ const ScoreCard = ({ active }) => {
                 {detail && (
                     <div>
                         <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
-                            {t("game.frame", { n: detail.frame, total: detail.frames })} · {t("game.roll", { n: detail.roll })}
+                            {t("game.frame", { n: detail.frame, total: BOWLING_FRAMES })} · {t("game.roll", { n: detail.roll })}
                         </p>
                         <BowlingSheet detail={detail} />
                     </div>
@@ -223,6 +258,27 @@ const HoldButton = ({ flag, label, children }) => {
     );
 };
 
+// The touch version of Space: a press, and held for as long as the finger stays.
+const ActionButton = ({ color, children }) => {
+    useEffect(() => () => (arcadeLink.holding = false), []);
+    const release = () => (arcadeLink.holding = false);
+    return (
+        <button
+            className="btn pointer-events-auto mb-1 h-16 touch-none px-7 text-lg"
+            style={{ "--c": color }}
+            onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                arcadeLink.action = true;
+                arcadeLink.holding = true;
+            }}
+            onPointerUp={release}
+            onPointerCancel={release}
+        >
+            {children}
+        </button>
+    );
+};
+
 const BowlingTouch = () => {
     const t = useT();
     return (
@@ -235,28 +291,26 @@ const BowlingTouch = () => {
                     <ChevronRight size={26} />
                 </HoldButton>
             </div>
-            <button
-                className="btn pointer-events-auto mb-1 h-16 px-7 text-lg"
-                style={{ "--c": "#8B5CF6" }}
-                onPointerDown={() => (arcadeLink.action = true)}
-            >
-                {t("game.throw")}
-            </button>
+            <ActionButton color="#8B5CF6">{t("game.throw")}</ActionButton>
         </div>
     );
 };
 
 const KEY_HELP = {
     bowling: [["←", "→"], ["key.space"]],
+    hook: [["←", "→"]],
     race: [["W", "A", "S", "D"]],
     bugs: [["W", "A", "S", "D"], ["key.space"]],
 };
 
 const KeyHelp = ({ active }) => {
     const t = useT();
+    // Once the ball is rolling, the arrows put hook on it instead.
+    const rolling = useArcade((s) => s.active === "bowling" && s.detail?.phase === "rolling");
+    const help = rolling ? "hook" : active;
     return (
         <div className="card pointer-events-none fixed bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap px-4 py-2 text-sm font-bold text-ink-soft">
-            {KEY_HELP[active].map((keys) => (
+            {KEY_HELP[help].map((keys) => (
                 <span key={keys.join()} className="flex gap-1">
                     {keys.map((k) => (
                         <span key={k} className="keycap">
@@ -265,23 +319,32 @@ const KeyHelp = ({ active }) => {
                     ))}
                 </span>
             ))}
-            <span>{t(`game.help.${active}`)}</span>
+            <span>{t(`game.help.${help}`)}</span>
         </div>
     );
 };
 
+// Space or Enter is each game's action button: pressed, and held.
+const isAction = (e) => e.code === "Space" || e.key === "Enter";
 const useGameKeys = () => {
     useEffect(() => {
-        const onKey = (e) => {
+        const down = (e) => {
             const { active, status } = useArcade.getState();
-            if (!active || e.repeat) return;
-            if (active === "bowling" && status === "playing" && (e.code === "Space" || e.key === "Enter")) {
-                e.preventDefault();
-                arcadeLink.action = true;
-            }
+            if (!active || status === "done" || !isAction(e)) return;
+            e.preventDefault();
+            if (e.repeat) return;
+            arcadeLink.action = true;
+            arcadeLink.holding = true;
         };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
+        const up = (e) => {
+            if (isAction(e)) arcadeLink.holding = false;
+        };
+        window.addEventListener("keydown", down);
+        window.addEventListener("keyup", up);
+        return () => {
+            window.removeEventListener("keydown", down);
+            window.removeEventListener("keyup", up);
+        };
     }, []);
 };
 
@@ -297,6 +360,7 @@ export const GameHud = () => {
             <Message />
             <AnimatePresence>{status === "done" && result && <Results key="results" active={active} result={result} />}</AnimatePresence>
             {active === "bowling" && status === "playing" && isTouch && <BowlingTouch />}
+            {active === "bowling" && <PowerMeter />}
             {active && status !== "done" && !isTouch && <KeyHelp active={active} />}
         </>
     );

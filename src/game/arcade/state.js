@@ -2,6 +2,14 @@
 // what the HUD shows (score, timer, messages) into this store.
 import { create } from "zustand";
 import { track } from "../../analytics";
+import { useStore } from "../../store";
+import { setMusicTrack } from "../sound";
+import { bowlingMusic, huntMusic, raceMusic, silenceLoops } from "./audio";
+
+const MUSIC = { bowling: bowlingMusic, race: raceMusic, bugs: huntMusic };
+// Games played under black light switch the island to night while they run.
+const NEON = new Set(["bowling", "bugs"]);
+let restoreDay = false;
 
 // v2: the race became a three-lap kart race, so older run times don't compare.
 const BEST_KEY = "nefise-island:arcade-best-v2";
@@ -35,8 +43,12 @@ export const arcadeLink = {
     camera: null,
     // One-off move: { x, z, rotY }.
     teleport: null,
-    // Set by the HUD's action button (throw, in bowling) until a game reads it.
+    // The action button (Space, Enter or the touch button): `action` is set on
+    // each press until a game reads it, `holding` while it is held down.
     action: false,
+    holding: false,
+    // A 0–1 gauge the HUD shows while it is set (bowling power).
+    meter: null,
     // Where the hammer just landed in Bug Smash: { x, z }, read once.
     hit: null,
     // Bugs that are up right now, for the hammer's aim assist: [{ x, z }].
@@ -46,6 +58,7 @@ export const arcadeLink = {
 const releasePlayer = () => {
     arcadeLink.lock = null;
     arcadeLink.camera = null;
+    arcadeLink.meter = null;
     arcadeLink.hit = null;
     arcadeLink.targets = [];
 };
@@ -79,6 +92,12 @@ export const useArcade = create((set, get) => ({
 
     start: (id) => {
         track("Game Started", { game: id });
+        const island = useStore.getState();
+        if (NEON.has(id) && !island.night) {
+            island.toggleNight();
+            restoreDay = true;
+        }
+        setMusicTrack(MUSIC[id]);
         set({
             active: id,
             run: get().run + 1,
@@ -93,6 +112,11 @@ export const useArcade = create((set, get) => ({
     },
     quit: () => {
         releasePlayer();
+        silenceLoops();
+        setMusicTrack(null);
+        const island = useStore.getState();
+        if (restoreDay && island.night) island.toggleNight();
+        restoreDay = false;
         set({ active: null, status: "idle", message: null, result: null, detail: null });
     },
     update: (patch) => set(patch),
@@ -102,7 +126,8 @@ export const useArcade = create((set, get) => ({
         set({ message: { id, key, vars, color } });
         setTimeout(() => get().message?.id === id && set({ message: null }), 1300);
     },
-    finish: (score) => {
+    // `extra` carries game-specific results for the HUD (a race position).
+    finish: (score, extra) => {
         const { active, best } = get();
         const record = beats(active, score, best[active]);
         if (record) {
@@ -112,6 +137,7 @@ export const useArcade = create((set, get) => ({
         }
         track("Game Finished", { game: active });
         releasePlayer();
-        set({ status: "done", score, result: { score, record, previous: best[active] } });
+        silenceLoops();
+        set({ status: "done", score, result: { score, record, previous: best[active], extra } });
     },
 }));

@@ -23,7 +23,8 @@ import { arcadeLink, useArcade } from "./arcade/state";
 import { Character } from "./Character";
 import { colliders } from "./scenery";
 import { bindKeyboard, bindPointerLook, cameraState, input, playerState } from "./input";
-import { playSound, setEngine } from "./sound";
+import { playSound } from "./sound";
+import { engineLoop } from "./arcade/audio";
 
 const WALK_SPEED = 4.6;
 const RUN_SPEED = 8.2;
@@ -225,11 +226,11 @@ export const Player = () => {
         let moving;
         if (driving) {
             moving = driveKart(s, pos, dt, canMove);
-            setEngine(s.kart.speed);
+            engineLoop.set(0.035 + Math.min(Math.abs(s.kart.speed), 18) * 0.003, 48 + Math.abs(s.kart.speed) * 7, 520);
             s.engine = true;
         } else {
             if (s.engine) {
-                setEngine(null);
+                engineLoop.set(0);
                 s.engine = false;
             }
             // Movement input, relative to where the camera looks.
