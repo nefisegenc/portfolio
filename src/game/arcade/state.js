@@ -15,8 +15,13 @@ const NEON = new Set(["bowling", "bugs", "riff", "head"]);
 const AWAY = new Set(["race", "bugs", "riff", "head"]);
 let restoreDay = false;
 
-// Bumped whenever a game's scoring changes so old records don't carry over
-// (v3: five-frame bowling, the Sky Circuit and Bug Hunt).
+// Every visitor shares one board of records: the best result anyone has set in
+// each game, kept by /api/scores. The last board seen is cached here so it
+// shows at once; without the server (offline, or no database) the records are
+// simply this browser's own.
+// Bumped, along with the server's key, whenever a game's scoring changes so
+// old records don't carry over (v3: five-frame bowling, the Sky Circuit and
+// Bug Hunt).
 const BEST_KEY = "nefise-island:arcade-best-v3";
 
 const loadBest = () => {
@@ -39,6 +44,26 @@ const saveBest = (best) => {
 // Race scores are times, so lower wins there.
 export const lowerIsBetter = (id) => id === "race";
 const beats = (id, score, best) => best === undefined || (lowerIsBetter(id) ? score < best : score > best);
+
+// Sends `scores` (game → result), if given, and returns the shared board, or
+// null when the server can't be reached.
+let syncs = 0;
+const syncBoard = async (scores) => {
+    const id = ++syncs;
+    try {
+        const res = await fetch(
+            "/api/scores",
+            scores && { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scores }) },
+        );
+        if (!res.ok) return null;
+        const { records } = await res.json();
+        // Only the latest request's board counts, so a slow read can't undo a
+        // record sent after it.
+        return id === syncs ? records : null;
+    } catch {
+        return null;
+    }
+};
 
 // Shared with the player controller, outside React like the input state.
 export const arcadeLink = {
@@ -110,7 +135,9 @@ export const useArcade = create((set, get) => ({
     // Which island the player is on: "main" or "arcade".
     area: "main",
     setArea: (area) => {
-        if (get().area !== area) set({ area });
+        if (get().area === area) return;
+        set({ area });
+        if (area === "arcade") get().loadBoard();
     },
 
     nearby: null,
@@ -130,6 +157,20 @@ export const useArcade = create((set, get) => ({
     message: null,
     result: null,
     best: loadBest(),
+    setBoard: (records) => {
+        saveBest(records);
+        set({ best: records });
+    },
+    // Brings in the shared board, sending up any record this browser holds
+    // that it hasn't got (set offline, or before the board was shared).
+    loadBoard: async () => {
+        let records = await syncBoard();
+        if (!records) return;
+        const { best } = get();
+        const missing = Object.fromEntries(Object.entries(best).filter(([id, score]) => beats(id, score, records[id])));
+        if (Object.keys(missing).length) records = await syncBoard(missing);
+        if (records) get().setBoard(records);
+    },
 
     start: (id) => {
         track("Game Started", { game: id });
@@ -154,7 +195,10 @@ export const useArcade = create((set, get) => ({
     // Game mode: the game menu opens from anywhere, and choosing a game
     // starts it straight away, wherever the player is (each game takes the
     // player where it's played).
-    openMenu: () => useStore.getState().openPanel({ type: "arcade" }),
+    openMenu: () => {
+        get().loadBoard();
+        useStore.getState().openPanel({ type: "arcade" });
+    },
     play: (id) => {
         const island = useStore.getState();
         island.closePanel();
@@ -205,13 +249,20 @@ export const useArcade = create((set, get) => ({
     },
     // `extra` carries game-specific results for the HUD (a race position).
     finish: (score, extra) => {
-        const { active, best } = get();
+        const { active, best, run } = get();
         // A run that scored nothing (a show booed off at once) sets no record.
         const record = score > 0 && beats(active, score, best[active]);
         if (record) {
-            const next = { ...best, [active]: score };
-            saveBest(next);
-            set({ best: next });
+            get().setBoard({ ...best, [active]: score });
+            syncBoard({ [active]: score }).then((records) => {
+                if (!records) return;
+                get().setBoard(records);
+                // Someone else may have set a better one since the board was read.
+                const { result } = get();
+                if (get().run === run && result?.record && records[active] !== score) {
+                    set({ result: { ...result, record: false, previous: records[active] } });
+                }
+            });
         }
         track("Game Finished", { game: active });
         // Games away from the island keep the player there behind the results.
@@ -220,3 +271,5 @@ export const useArcade = create((set, get) => ({
         set({ status: "done", score, result: { score, record, previous: best[active], extra } });
     },
 }));
+
+useArcade.getState().loadBoard();

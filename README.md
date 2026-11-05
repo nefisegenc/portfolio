@@ -35,6 +35,10 @@ npm run dev
 
 The 3D scene is code-split from the rest of the app, so the title screen and quick view load first.
 
+### Shared arcade records
+
+The arcade's high scores are shared by every visitor through `api/scores.js`, a Vercel function backed by Upstash Redis. To turn it on, open the project on Vercel, go to **Storage → Upstash for Redis**, create a free database, connect it to the project and redeploy. Without the database each browser keeps its own records, as before. During `npm run dev` the board is kept in memory by the dev server.
+
 ### Regenerating the CV
 
 `public/cv/Nefise-Nur-Genc-CV.pdf` is built from `src/data/projects.js` with headless Chrome:
