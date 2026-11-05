@@ -164,6 +164,8 @@ export const RACE_SIGN = { x: 6.6, z: 9.4, rot: -0.9 };
 // Solid things on the arcade, in world space.
 const local = [
     { x: BOARD.x, z: BOARD.z, r: 1.7 },
+    // The board's posts, out at its edges.
+    ...[-1, 1].map((s) => ({ x: BOARD.x + s * 2, z: BOARD.z, r: 0.25 })),
     ...[-1, 1].map((s) => ({ x: ENTRY.x + s * 1.95, z: ENTRY.z, r: 0.3 })),
     ...ARCADE_LAMPS.map(([x, z]) => ({ x, z, r: 0.15 })),
     ...ARCADE_TREES.map(([x, z, s]) => ({ x, z, r: 0.35 * s })),

@@ -86,7 +86,7 @@ const GameCard = ({ game, best, onPlay }) => {
         <li>
             <button
                 onClick={onPlay}
-                className="group flex w-full items-center gap-4 rounded-3xl border-2 border-white/10 bg-white/[0.04] p-3.5 text-left transition hover:-translate-y-0.5 hover:border-[var(--c)] hover:bg-white/[0.08] focus-visible:border-[var(--c)] md:p-4"
+                className="group flex h-full w-full items-center gap-4 rounded-3xl border-2 border-white/10 bg-white/[0.04] p-3.5 text-left transition hover:-translate-y-0.5 hover:border-[var(--c)] hover:bg-white/[0.08] focus-visible:border-[var(--c)] md:p-4"
                 style={{ "--c": game.color }}
             >
                 <span
@@ -110,8 +110,9 @@ const GameCard = ({ game, best, onPlay }) => {
                         </span>
                     </span>
                 </span>
-                <span className="btn hidden flex-none px-4 py-2.5 text-base sm:inline-flex" style={{ "--c": game.color }}>
-                    <PlayIcon size={14} /> {t("game.play")}
+                {/* Two to a row the cards are narrow, so the label steps aside for the text. */}
+                <span className="btn hidden flex-none px-4 py-2.5 text-base sm:inline-flex md:px-3.5" style={{ "--c": game.color }}>
+                    <PlayIcon size={14} /> <span className="md:sr-only">{t("game.play")}</span>
                 </span>
             </button>
         </li>
@@ -159,7 +160,8 @@ export const ArcadeMenu = () => {
                 <p className="eyebrow text-[#F472B6]">{t("mode.games")}</p>
                 <h2 className="font-display text-3xl font-extrabold leading-tight md:text-4xl">{t("arcade.menuTitle")}</h2>
                 <p className="mt-1 max-w-xl text-sm font-semibold text-white/70">{t("arcade.menuLead")}</p>
-                <ul className="mt-5 grid gap-3 md:grid-cols-2">
+                {/* Cards share one height, however their text wraps. */}
+                <ul className="mt-5 grid gap-3 md:auto-rows-fr md:grid-cols-2">
                     {games.map((g) => (
                         <GameCard key={g.id} game={g} best={best[g.id]} onPlay={() => play(g.id)} />
                     ))}

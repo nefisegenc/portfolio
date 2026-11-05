@@ -1,6 +1,6 @@
 // The arcade island's scenery: the island itself, the rope bridge, the
 // entrance arch, the high-score board and the pads that start each game.
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html, Text } from "@react-three/drei";
 import { MathUtils, Object3D } from "three";
@@ -162,50 +162,87 @@ const Arch = () => {
     );
 };
 
-const BoardLine = ({ y, color, label, value }) => (
-    <group position={[0, y, 0.17]}>
-        <Text font={FONT} fontSize={0.27} color="#FFFFFF" anchorX="left" anchorY="middle" position={[-1.45, 0, 0]}>
+// The high-score board: a big neon sign in the middle of the island, facing
+// the entrance.
+const BOARD_W = 4.6;
+const BOARD_H = 3.5;
+const BOARD_Y = 3.1;
+const BOARD_TOP = BOARD_Y + BOARD_H / 2;
+const BULBS = ["#FACC15", "#22D3EE", ARCADE_COLOR];
+
+const BoardLine = ({ y, color, label, value, stripe }) => (
+    <group position={[0, y, 0.14]}>
+        {stripe && <Box args={[BOARD_W - 0.5, 0.42, 0.02]} color="#2A2340" />}
+        <Ball radius={0.09} detail={1} position={[-1.85, 0, 0.03]}>
+            <GlowMat color={color} strength={1.6} />
+        </Ball>
+        <Text font={FONT} fontSize={0.32} color="#FFFFFF" anchorX="left" anchorY="middle" position={[-1.65, 0, 0.03]}>
             {label}
         </Text>
-        <Text font={FONT} fontSize={0.3} color={color} anchorX="right" anchorY="middle" position={[1.45, 0, 0]}>
+        <Text font={FONT} fontSize={0.36} anchorX="right" anchorY="middle" position={[1.95, 0, 0.03]}>
             {value}
+            <GlowMat color={color} strength={1.3} />
         </Text>
     </group>
 );
 
-const ScoreBoard = () => {
+// `occluder` stands in front of the board, invisible, so labels behind it hide
+// instead of drawing over the scores.
+const ScoreBoard = ({ occluder }) => {
     const best = useArcade((s) => s.best);
     const t = useT();
     return (
         <group position={[BOARD.x, 0, BOARD.z]}>
             <Shadowed>
-                {[-1.45, 1.45].map((x) => (
-                    <Box key={x} args={[0.2, 2.4, 0.2]} position={[x, 1.2, -0.05]} color="#3B3350" />
+                {[-1, 1].map((s) => (
+                    <Box key={s} args={[0.22, BOARD_Y, 0.22]} position={[s * (BOARD_W / 2 - 0.3), BOARD_Y / 2, -0.05]} color="#3B3350" />
                 ))}
-                <Box args={[3.5, 2.7, 0.26]} position={[0, 3.05, 0]} color="#1C1730" />
+                <Box args={[BOARD_W, BOARD_H, 0.26]} position={[0, BOARD_Y, 0]} color="#1C1730" />
             </Shadowed>
-            <Box args={[3.62, 0.08, 0.3]} position={[0, 4.42, 0]}>
-                <GlowMat color={ARCADE_COLOR} strength={2} />
-            </Box>
-            <Text font={FONT} fontSize={0.34} position={[0, 4.05, 0.17]} anchorY="middle">
+            {/* A glowing frame, with marquee bulbs along the top. */}
+            {[-1, 1].map((s) => (
+                <group key={s}>
+                    <Box args={[BOARD_W + 0.12, 0.08, 0.3]} position={[0, BOARD_Y + s * (BOARD_H / 2), 0]}>
+                        <GlowMat color={ARCADE_COLOR} strength={2} />
+                    </Box>
+                    <Box args={[0.08, BOARD_H, 0.3]} position={[s * (BOARD_W / 2 + 0.02), BOARD_Y, 0]}>
+                        <GlowMat color={ARCADE_COLOR} strength={2} />
+                    </Box>
+                </group>
+            ))}
+            {Array.from({ length: 11 }, (_, i) => (
+                <Ball key={i} radius={0.08} detail={1} position={[(i / 10 - 0.5) * (BOARD_W - 0.3), BOARD_TOP + 0.13, 0.05]}>
+                    <GlowMat color={BULBS[i % BULBS.length]} strength={2.2} />
+                </Ball>
+            ))}
+            <Text font={FONT} fontSize={0.5} position={[0, BOARD_TOP - 0.45, 0.17]} anchorY="middle">
                 {t("arcade.board")}
-                <GlowMat color="#FACC15" strength={1.6} />
+                <GlowMat color="#FACC15" strength={1.8} />
             </Text>
+            <Box args={[BOARD_W - 0.5, 0.04, 0.02]} position={[0, BOARD_TOP - 0.82, 0.14]}>
+                <GlowMat color="#FACC15" strength={1.2} />
+            </Box>
             {games.map((g, i) => (
                 <BoardLine
                     key={g.id}
-                    y={3.58 - i * 0.4}
+                    y={BOARD_TOP - 1.17 - i * 0.48}
+                    stripe={i % 2 === 0}
                     color={g.color}
                     label={t(`game.${g.id}`)}
                     value={best[g.id] === undefined ? "—" : formatScore(g.id, best[g.id])}
                 />
             ))}
+            {/* Down past the board's foot, as far as a label centred just under it reaches. */}
+            <mesh ref={occluder} position={[0, (BOARD_TOP + 0.6) / 2, 0.2]} visible={false}>
+                <planeGeometry args={[BOARD_W + 0.6, BOARD_TOP - 0.6]} />
+            </mesh>
         </group>
     );
 };
 
-const Pad = ({ game }) => {
+const Pad = ({ game, occluder }) => {
     const ref = useRef();
+    const [behindBoard, setBehindBoard] = useState(false);
     const t = useT();
     const active = useArcade((s) => s.nearby === game.id && !s.active);
     // Labels step aside while a game runs so they don't block its camera.
@@ -228,8 +265,19 @@ const Pad = ({ game }) => {
                     <meshBasicMaterial color={game.color} transparent opacity={active ? 0.3 : 0.14} depthWrite={false} />
                 </mesh>
             </group>
-            <Html position={[0, 2.2, 0]} center distanceFactor={18} zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-                <div className={`landmark-label${active ? " is-active" : ""}${playing ? "" : " is-hidden"}`} style={{ "--c": game.color }}>
+            <Html
+                position={[0, 2.2, 0]}
+                center
+                distanceFactor={18}
+                zIndexRange={[20, 0]}
+                occlude={[occluder]}
+                onOcclude={setBehindBoard}
+                style={{ pointerEvents: "none" }}
+            >
+                <div
+                    className={`landmark-label${active ? " is-active" : ""}${playing && !behindBoard ? "" : " is-hidden"}`}
+                    style={{ "--c": game.color }}
+                >
                     {t(`game.${game.id}`)}
                 </div>
             </Html>
@@ -408,30 +456,33 @@ const HeadCorner = () => {
 };
 
 // Children are placed in arcade space.
-export const ArcadeIsland = ({ children }) => (
-    <>
-        <Bridge />
-        <Signpost />
-        <group position={[ARCADE.x, 0, ARCADE.z]} rotation-y={ARCADE.rotY}>
-            <TopLayer radius={ARCADE_RADIUS} patches={PATCHES} />
-            <Underside radius={ARCADE_RADIUS} />
-            <Walkways />
-            <Arch />
-            <ScoreBoard />
-            <RaceCorner />
-            <BugPortal />
-            <RiffCorner />
-            <HeadCorner />
-            {games.map((g) => (
-                <Pad key={g.id} game={g} />
-            ))}
-            {ARCADE_LAMPS.map(([x, z, c]) => (
-                <Lamp key={`${x}${z}`} x={x} z={z} color={c} />
-            ))}
-            {ARCADE_TREES.map(([x, z, s]) => (
-                <Tree key={`${x}${z}`} x={x} z={z} s={s} />
-            ))}
-            {children}
-        </group>
-    </>
-);
+export const ArcadeIsland = ({ children }) => {
+    const occluder = useRef();
+    return (
+        <>
+            <Bridge />
+            <Signpost />
+            <group position={[ARCADE.x, 0, ARCADE.z]} rotation-y={ARCADE.rotY}>
+                <TopLayer radius={ARCADE_RADIUS} patches={PATCHES} />
+                <Underside radius={ARCADE_RADIUS} />
+                <Walkways />
+                <Arch />
+                <ScoreBoard occluder={occluder} />
+                <RaceCorner />
+                <BugPortal />
+                <RiffCorner />
+                <HeadCorner />
+                {games.map((g) => (
+                    <Pad key={g.id} game={g} occluder={occluder} />
+                ))}
+                {ARCADE_LAMPS.map(([x, z, c]) => (
+                    <Lamp key={`${x}${z}`} x={x} z={z} color={c} />
+                ))}
+                {ARCADE_TREES.map(([x, z, s]) => (
+                    <Tree key={`${x}${z}`} x={x} z={z} s={s} />
+                ))}
+                {children}
+            </group>
+        </>
+    );
+};
