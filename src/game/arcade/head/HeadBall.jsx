@@ -818,19 +818,24 @@ const toWorld = (v, x, y, z) => {
 
 // Far enough back to fit both goals on a wide screen; on a narrow one the
 // camera follows the ball along the pitch instead.
-// Touch screens fit the pitch, floor to ceiling, between the score card and
-// the buttons along the bottom (in pixels; upright phones also show a hint
-// under the card), and upright ones stand further back to show more of it.
-const TOUCH_TOP = { wide: 76, upright: 128 };
-const TOUCH_BOTTOM = 100;
-const BAND = { low: -0.3, high: CEILING + 0.3 };
+// Touch screens fit a band of the pitch between the score card and the
+// buttons along the bottom (in pixels; upright phones also show a hint under
+// the card). Upright ones fit it floor to ceiling, standing further back to
+// show more of the pitch's width; sideways ones are short, so they fit it up
+// to just under the ceiling and come in closer, the ceiling going behind the
+// card.
+const TOUCH_FRAME = {
+    upright: { top: 128, bottom: 100, high: CEILING + 0.3, near: 15 },
+    wide: { top: 64, bottom: 84, high: CEILING - 1, near: 11 },
+};
+const FLOOR = -0.3;
 const frameTouch = (size, tan, aspect, span) => {
-    const top = size.height > size.width ? TOUCH_TOP.upright : TOUCH_TOP.wide;
-    const free = Math.max(0.3, (size.height - top - TOUCH_BOTTOM) / size.height);
-    const dist = Math.max(15, Math.min(30, span / (tan * aspect)), (BAND.high - BAND.low) / (free * 2 * tan));
+    const { top, bottom, high, near } = TOUCH_FRAME[size.height > size.width ? "upright" : "wide"];
+    const free = Math.max(0.3, (size.height - top - bottom) / size.height);
+    const dist = Math.max(near, Math.min(30, span / (tan * aspect)), (high - FLOOR) / (free * 2 * tan));
     // Where the free space's middle sits, from the top of the screen (0) to the bottom (1).
     const mid = (top + (free * size.height) / 2) / size.height;
-    return { dist, lookY: (BAND.low + BAND.high) / 2 + (mid - 0.5) * 2 * dist * tan };
+    return { dist, lookY: (FLOOR + high) / 2 + (mid - 0.5) * 2 * dist * tan };
 };
 const aimCamera = (g, size) => {
     const aspect = size.width / Math.max(1, size.height);
