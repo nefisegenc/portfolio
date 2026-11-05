@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* Phones held sideways are wide enough for `md:` but too short for its
+   layout; `short:` is them, and `phone:` is any phone, upright or not. */
+@custom-variant short (@media (max-height: 520px));
+@custom-variant phone {
+    @media (width < 48rem) {
+        @slot;
+    }
+    @media (max-height: 520px) {
+        @slot;
+    }
+}
+
 @theme {
     --font-display: "Baloo 2", ui-rounded, system-ui, sans-serif;
     --font-body: "Nunito", system-ui, sans-serif;

@@ -11,6 +11,7 @@ import { seeded } from "../../../data/world";
 import { useT } from "../../../i18n";
 import { Underside } from "../../Island";
 import { Box, Cyl, FONT, GlowMat, InstanceColors, Shadowed } from "../../parts";
+import { isTouch } from "../../utils";
 import { audioLatency, audioTime, playSound, setMusicTrack } from "../../sound";
 import { guitar, riffMusic, silence } from "../audio";
 import { COUNTDOWN, tickCountdown } from "../countdown";
@@ -50,6 +51,31 @@ const MAX_SPARKS = 160;
 const MAX_NOTES = 72;
 
 const cam = { position: new Vector3(), target: new Vector3(), stiffness: 6, fov: 50 };
+// The camera watches from the crowd (stage space, y and z), looking at the stage.
+const EYE = { y: 4.6, z: 12.8 };
+const LOOK = { y: 0.9, z: -2 };
+// Narrow screens pull it back along its line of sight until all four lanes
+// fit across the hit line (half the highway's width, plus a margin), and
+// touch screens tilt it down until the hit line clears the fret buttons
+// (in pixels from the bottom; they're smaller on short screens).
+const HIT_HALF = 2.4;
+const fretsClear = (height) => (height <= 520 ? 84 : 104);
+const frame = (size) => {
+    const tan = Math.tan((cam.fov * Math.PI) / 360);
+    const across = tan * (size.width / Math.max(1, size.height));
+    const eye = (k) => ({ y: LOOK.y + (EYE.y - LOOK.y) * k, z: LOOK.z + (EYE.z - LOOK.z) * k });
+    let k = 1;
+    while (k < 2 && Math.hypot(eye(k).y - HIGHWAY.y, eye(k).z - HIGHWAY.near) * across < HIT_HALF) k += 0.02;
+    const from = eye(k);
+    if (!isTouch) return { from, to: LOOK };
+    // Angles below the horizon: the camera's line of sight, and the hit line.
+    const sight = Math.atan2(from.y - LOOK.y, from.z - LOOK.z);
+    const hit = Math.atan2(from.y - HIGHWAY.y, from.z - HIGHWAY.near);
+    const below = 1 - (2 * fretsClear(size.height)) / size.height;
+    const tilt = Math.max(sight, hit - Math.atan(below * tan));
+    const reach = Math.hypot(from.y - LOOK.y, from.z - LOOK.z);
+    return { from, to: { y: from.y - Math.sin(tilt) * reach, z: from.z - Math.cos(tilt) * reach } };
+};
 
 // --- Game ----------------------------------------------------------------------
 
@@ -504,7 +530,7 @@ export const Riff = () => {
         ["notes", "caps", "tails", "sparks", "beats"].forEach((k) => refs.current[k] && (refs.current[k].count = 0));
     }, []);
 
-    useFrame(({ clock }, rawDt) => {
+    useFrame(({ clock, size }, rawDt) => {
         const dt = Math.min(rawDt, 0.05);
         const now = clock.elapsedTime;
         const g = game.current;
@@ -526,8 +552,9 @@ export const Riff = () => {
             // Camera from the crowd, bobbing gently with the beat.
             const beat = t >= 0 ? (t / BEAT) % 1 : 0;
             arcadeLink.beat = beat;
-            const [cx, cy, cz] = stageToWorld(0, 4.6 + Math.sin(beat * Math.PI * 2) * 0.04, 12.8);
-            const [tx, ty, tz] = stageToWorld(0, 0.9, -2);
+            const { from, to } = frame(size);
+            const [cx, cy, cz] = stageToWorld(0, from.y + Math.sin(beat * Math.PI * 2) * 0.04, from.z);
+            const [tx, ty, tz] = stageToWorld(0, to.y, to.z);
             cam.position.set(cx, cy, cz);
             cam.target.set(tx, ty, tz);
             arcadeLink.camera = cam;

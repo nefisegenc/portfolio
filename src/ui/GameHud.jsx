@@ -105,7 +105,7 @@ const PowerMeter = () => {
             className="card pointer-events-none fixed left-6 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-2 px-2 py-3 opacity-0 transition-opacity max-md:left-3"
         >
             <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">{t("game.power")}</p>
-            <div className="relative h-40 w-5 overflow-hidden rounded-full bg-ink/10">
+            <div className="relative h-40 w-5 overflow-hidden rounded-full bg-ink/10 short:h-28">
                 <div ref={fill} className="absolute inset-x-0 bottom-0 rounded-full" />
             </div>
         </div>
@@ -151,7 +151,7 @@ const ScoreCard = ({ active }) => {
                 <Stat label={t("game.score")} value={score} color={game.color} />
                 <Stat label={t("game.mult")} value={`x${detail.mult}`} color={detail.mult > 1 ? "#F59E0B" : undefined} />
                 <Stat label={t("game.combo")} value={detail.combo} />
-                <div className="w-28 space-y-1">
+                <div className="w-24 space-y-1 md:w-28">
                     <Bar label={t("game.crowd")} value={detail.rock} />
                     <Bar label={t("game.song")} value={detail.progress} color="#A78BFA" />
                 </div>
@@ -167,7 +167,7 @@ const ScoreCard = ({ active }) => {
                     color={detail.golden ? "#D97706" : detail.time <= 10 ? "#DC2626" : undefined}
                 />
                 <Stat label="Backend" value={detail.goals[1]} color={BACK} />
-                <div className="w-28 space-y-1">
+                <div className="w-24 space-y-1 md:w-28">
                     <Bar label={t("head.turbo")} value={detail.force} color={detail.force >= 1 ? "#F97316" : "#A855F7"} />
                     <Powers powers={detail.powers} />
                 </div>
@@ -179,7 +179,7 @@ const ScoreCard = ({ active }) => {
                 <Stat label={t("game.wave")} value={`${detail.wave}/${detail.waves}`} />
                 <Stat label={t("game.score")} value={score} color={game.color} />
                 <Stat label={t("game.combo")} value={`x${detail.combo}`} color={detail.combo > 1 ? "#F59E0B" : undefined} />
-                <div className="w-28 space-y-1">
+                <div className="w-24 space-y-1 md:w-28">
                     <Bar label={t("game.core")} value={detail.core} />
                     <Bar label={t("game.you")} value={detail.hp} />
                     <Bar label={t("game.heat")} value={detail.heat} color={detail.overheat ? "#EF4444" : detail.heat > 0.7 ? "#F97316" : "#22D3EE"} />
@@ -196,21 +196,21 @@ const ScoreCard = ({ active }) => {
 
     return (
         <motion.div
-            className="card pointer-events-auto fixed inset-x-3 top-[156px] z-20 flex items-center justify-between gap-4 py-2 pl-4 pr-2 md:inset-x-auto md:left-1/2 md:top-6 md:-translate-x-1/2 [@media(max-height:520px)]:inset-x-auto [@media(max-height:520px)]:left-1/2 [@media(max-height:520px)]:top-2 [@media(max-height:520px)]:-translate-x-1/2"
+            className="card pointer-events-auto fixed inset-x-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20 flex items-center justify-between gap-3 py-2 pl-4 pr-2 md:inset-x-auto md:left-1/2 md:top-6 md:-translate-x-1/2 md:gap-4 short:inset-x-auto short:left-1/2 short:top-2 short:-translate-x-1/2 short:gap-4 short:py-1.5"
             style={{ borderColor: game.color }}
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
         >
-            <div className="hidden md:block">
+            <div className="phone:hidden">
                 <p className="eyebrow" style={{ color: game.color }}>
                     {t("arcade.name")}
                 </p>
                 <p className="font-display text-lg font-extrabold leading-tight">{t(`game.${active}`)}</p>
             </div>
             {stats}
-            {/* The record stays off small screens to leave room for the game's own stats. */}
-            <div className="max-md:hidden">
+            {/* The record stays off phones to leave room for the game's own stats. */}
+            <div className="phone:hidden">
                 <Stat label={t("game.best")} value={best === undefined ? "–" : formatScore(active, best)} />
             </div>
             <button
@@ -221,6 +221,7 @@ const ScoreCard = ({ active }) => {
             >
                 <CloseIcon size={16} />
             </button>
+            {active === "head" && isTouch && <RotateHint />}
         </motion.div>
     );
 };
@@ -276,7 +277,7 @@ const Results = ({ active, result }) => {
         <motion.div
             role="dialog"
             aria-label={t("game.result")}
-            className="card pointer-events-auto fixed left-1/2 top-1/2 z-40 w-[min(90vw,340px)] -translate-x-1/2 -translate-y-1/2 p-6 text-center"
+            className="card pointer-events-auto fixed left-1/2 top-1/2 z-40 max-h-[calc(100dvh-1rem)] w-[min(90vw,340px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-6 text-center short:p-4"
             style={{ borderColor: game.color }}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -435,8 +436,8 @@ const HeadTouch = () => {
     );
 };
 
-// Head to Head is played side-on, so phones held upright get a nudge to
-// turn sideways.
+// Head to Head is played side-on, so phones held upright get a nudge, just
+// under the score card, to turn sideways.
 const RotateHint = () => {
     const t = useT();
     const [upright, setUpright] = useState(() => window.innerHeight > window.innerWidth);
@@ -447,7 +448,7 @@ const RotateHint = () => {
     }, []);
     if (!upright) return null;
     return (
-        <p className="card pointer-events-none fixed inset-x-0 top-[248px] z-20 mx-auto w-fit px-3 py-1.5 text-xs font-bold text-ink-soft">
+        <p className="card pointer-events-none absolute left-1/2 top-full mt-2 w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 px-3 py-1.5 text-center text-xs font-bold text-ink-soft">
             {t("head.rotate")}
         </p>
     );
@@ -481,20 +482,21 @@ const RaceGauges = () => {
         return () => cancelAnimationFrame(frame);
     }, []);
     const colors = ["#22C55E", "#3B82F6", "#EAB308", "#F97316"];
+    // On phones the gauges sit just above the nitro button, kept small.
     return (
-        <div className="pointer-events-none fixed bottom-6 right-6 z-20 flex items-end gap-3 max-md:bottom-[170px] max-md:right-3">
-            <div className="card px-4 py-2 text-center">
-                <p className="font-display text-4xl font-extrabold leading-none tabular-nums">
+        <div className="pointer-events-none fixed bottom-6 right-6 z-20 flex items-end gap-3 phone:bottom-[104px] phone:right-3 phone:gap-2">
+            <div className="card px-4 py-2 text-center phone:px-3 phone:py-1.5">
+                <p className="font-display text-4xl font-extrabold leading-none tabular-nums phone:text-2xl">
                     <span ref={speed}>0</span>
                 </p>
                 <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">{t("game.speed")}</p>
-                <div className="mt-2 h-2.5 w-28 overflow-hidden rounded-full bg-ink/10">
+                <div className="mt-2 h-2.5 w-28 overflow-hidden rounded-full bg-ink/10 phone:mt-1 phone:w-20">
                     <div ref={nitro} className="h-full rounded-full bg-gradient-to-r from-[#22D3EE] to-[#3B82F6]" />
                 </div>
                 <p className="mt-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#2563EB]">{t("game.nitro")}</p>
             </div>
             <div className="card hidden p-2 md:block">
-                <svg viewBox={map?.viewBox ?? "0 0 1 1"} className="h-28 w-36">
+                <svg viewBox={map?.viewBox ?? "0 0 1 1"} className="h-28 w-36 short:h-16 short:w-20">
                     {map && <path d={map.d} fill="none" stroke="#2A2340" strokeOpacity="0.25" strokeWidth="7" strokeLinejoin="round" />}
                     <g ref={dots}>
                         {colors.map((c, i) => (
@@ -610,14 +612,14 @@ const RiffJudge = () => {
 const RiffTouch = () => {
     useEffect(() => () => LANE_COLORS.forEach((_, lane) => arcadeLink.fret?.(lane, false)), []);
     return (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 flex justify-center gap-2 px-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 flex justify-center gap-2 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] short:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {LANE_COLORS.map((c, lane) => {
                 const up = () => arcadeLink.fret?.(lane, false);
                 return (
                     <button
                         key={c}
                         aria-label={`${lane + 1}`}
-                        className="pointer-events-auto h-16 flex-1 touch-none rounded-2xl border-[3px] border-white/80 shadow-[0_4px_0_rgb(42_35_64/0.3)] active:translate-y-1 active:brightness-125"
+                        className="pointer-events-auto h-16 flex-1 touch-none rounded-2xl short:h-14 border-[3px] border-white/80 shadow-[0_4px_0_rgb(42_35_64/0.3)] active:translate-y-1 active:brightness-125"
                         style={{ background: c, maxWidth: 76 }}
                         onPointerDown={(e) => {
                             arcadeLink.fret?.(lane, true);
@@ -716,7 +718,6 @@ export const GameHud = () => {
             {active === "riff" && <RiffJudge />}
             {active === "riff" && status === "playing" && isTouch && <RiffTouch />}
             {active === "head" && status === "playing" && isTouch && <HeadTouch />}
-            {active === "head" && status !== "done" && isTouch && <RotateHint />}
             {active && status !== "done" && !isTouch && !riffUnderway && <KeyHelp active={active} />}
         </>
     );

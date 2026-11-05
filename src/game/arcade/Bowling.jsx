@@ -457,6 +457,13 @@ export const Bowling = () => {
         arcadeLink.camera = cam;
     };
 
+    // Over the left shoulder, so the bowler doesn't hide the pins; phones
+    // (upright, or too short for much of the lane) look from higher up instead.
+    const aimCamera = (g) => {
+        const phone = window.innerHeight > window.innerWidth || window.innerHeight <= 520;
+        setCamera(g.aimU - 0.6, phone ? -3.6 : -3.3, phone ? 3.1 : 2.4, g.aimU * 0.3, 7, 0.2);
+    };
+
     const publish = (g) => {
         const totals = frameTotals(g.frames);
         const known = totals.filter((n) => n !== null);
@@ -557,8 +564,7 @@ export const Bowling = () => {
                 b.v = -0.5;
                 const [px, pz] = toWorldLane(g.aimU, -0.85);
                 arcadeLink.lock = { x: px, z: pz, rotY: worldYaw(0, -1) };
-                // Over the left shoulder, so the bowler doesn't hide the pins.
-                setCamera(g.aimU - 0.6, -3.3, 2.4, g.aimU * 0.3, 7, 0.2);
+                aimCamera(g);
             } else if (g.phase === "rolling") {
                 g.timer += dt;
                 // Hook: steer the ball's curve until it reaches the pins.
@@ -617,7 +623,7 @@ export const Bowling = () => {
                     b.state = "held";
                     publish(g);
                 }
-                setCamera(g.aimU - 0.6, -3.3, 2.4, g.aimU * 0.3, 7, 0.2);
+                aimCamera(g);
             } else if (g.phase === "over") {
                 g.timer += realDt;
                 if (g.timer > 1.6) {

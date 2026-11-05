@@ -834,7 +834,9 @@ export const Race = () => {
         arcadeLink.focus = { x: p.x, z: p.z };
         const dx = Math.sin(p.heading);
         const dz = Math.cos(p.heading);
-        cam.position.set(p.x - dx * 7, p.y + 2.8, p.z - dz * 7);
+        // Narrow screens see less of the road sideways, so sit further back and higher.
+        const far = Math.max(1, Math.min(1.35, (0.75 * window.innerHeight) / window.innerWidth));
+        cam.position.set(p.x - dx * 7 * far, p.y + 2.8 * far, p.z - dz * 7 * far);
         cam.target.set(p.x + dx * 5, p.y + 0.9, p.z + dz * 5);
         if (p.shake > 0) {
             p.shake -= dt;

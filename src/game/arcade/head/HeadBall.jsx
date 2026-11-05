@@ -817,21 +817,35 @@ const toWorld = (v, x, y, z) => {
 };
 
 // Far enough back to fit both goals on a wide screen; on a narrow one the
-// camera follows the ball along the pitch instead. Touch screens frame the
-// pitch higher, clear of the buttons along the bottom.
-const LOOK_Y = isTouch ? 2.3 : 3.4;
+// camera follows the ball along the pitch instead.
+// Touch screens fit the pitch, floor to ceiling, between the score card and
+// the buttons along the bottom (in pixels; upright phones also show a hint
+// under the card), and upright ones stand further back to show more of it.
+const TOUCH_TOP = { wide: 76, upright: 128 };
+const TOUCH_BOTTOM = 100;
+const BAND = { low: -0.3, high: CEILING + 0.3 };
+const frameTouch = (size, tan, aspect, span) => {
+    const top = size.height > size.width ? TOUCH_TOP.upright : TOUCH_TOP.wide;
+    const free = Math.max(0.3, (size.height - top - TOUCH_BOTTOM) / size.height);
+    const dist = Math.max(15, Math.min(30, span / (tan * aspect)), (BAND.high - BAND.low) / (free * 2 * tan));
+    // Where the free space's middle sits, from the top of the screen (0) to the bottom (1).
+    const mid = (top + (free * size.height) / 2) / size.height;
+    return { dist, lookY: (BAND.low + BAND.high) / 2 + (mid - 0.5) * 2 * dist * tan };
+};
 const aimCamera = (g, size) => {
     const aspect = size.width / Math.max(1, size.height);
     const tan = Math.tan((cam.fov * Math.PI) / 360);
     const span = WALL + 0.5;
-    const dist = Math.max(15, Math.min(22, span / (tan * aspect)));
+    const { dist, lookY } = isTouch
+        ? frameTouch(size, tan, aspect, span)
+        : { dist: Math.max(15, Math.min(22, span / (tan * aspect))), lookY: 3.4 };
     const room = Math.max(0, span - dist * tan * aspect);
     const x = Math.max(-room, Math.min(room, g.ball.x * 0.85));
     const shake = g.shake * 0.4;
     // Level with the crossbars, so the pitch sits low in the frame with the
     // stands and sky above it.
     toWorld(cam.position, x + (Math.random() - 0.5) * shake, 3.6 + (Math.random() - 0.5) * shake, dist);
-    toWorld(cam.target, x, LOOK_Y, 0);
+    toWorld(cam.target, x, lookY, 0);
     arcadeLink.camera = cam;
 };
 

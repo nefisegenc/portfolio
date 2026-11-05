@@ -692,8 +692,9 @@ export const BugHunt = () => {
             cameraState.yaw = CAM_YAW;
             const shake = g.shake > 0 ? g.shake : 0;
             g.shake = Math.max(0, g.shake - dt);
-            // Portrait screens see less of the arena sideways, so pull back.
-            const far = window.innerHeight > window.innerWidth ? 1.35 : 1;
+            // Narrow screens see less of the arena sideways, so pull back
+            // (up to 1.7 times as far on a phone held upright).
+            const far = Math.max(1, Math.min(1.7, (0.85 * window.innerHeight) / window.innerWidth));
             cam.position.set(px + (Math.random() - 0.5) * shake, HUNT.y + 13.5 * far, pz + 9.5 * far);
             cam.target.set(px, HUNT.y + 0.5, pz - 1.5);
             arcadeLink.camera = cam;

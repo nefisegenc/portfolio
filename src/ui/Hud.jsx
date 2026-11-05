@@ -79,10 +79,8 @@ const Progress = () => {
     );
 };
 
-// During a game, small screens keep only the minimap so the score card fits;
-// games played away from the islands hide it, the race showing its own.
+// Games played away from the islands hide the minimap, the race showing its own.
 const TopRight = ({ helpOpen, onHelp, game }) => {
-    const gameActive = Boolean(game);
     const openPanel = useStore((s) => s.openPanel);
     const night = useStore((s) => s.night);
     const toggleNight = useStore((s) => s.toggleNight);
@@ -101,10 +99,8 @@ const TopRight = ({ helpOpen, onHelp, game }) => {
                 <IslandMap />
                 <span className="keycap absolute bottom-2 right-3 hidden md:inline-grid">M</span>
             </button>
-            <div className={gameActive ? "max-md:hidden" : undefined}>
-                <Progress />
-            </div>
-            <div className={`grid grid-cols-3 gap-1.5 ${gameActive ? "max-md:hidden" : ""}`}>
+            <Progress />
+            <div className="grid grid-cols-3 gap-1.5">
                 <button className={btn} onClick={() => openPanel({ type: "map" })} aria-label={t("hud.map")} title={`${t("hud.map")} (M)`}>
                     <MapIcon size={19} />
                 </button>
@@ -339,6 +335,9 @@ const Joystick = () => {
     );
 };
 
+// Games whose touch buttons replace the joystick (Riff Rush's player stays on stage).
+const OWN_CONTROLS = new Set(["bowling", "riff", "head"]);
+
 // In a game the jump button gives way to the game's own action button.
 const MobileControls = ({ game }) => {
     const t = useT();
@@ -361,7 +360,6 @@ const MobileControls = ({ game }) => {
 export const Hud = () => {
     const panel = useStore((s) => s.panel);
     const game = useArcade((s) => s.active);
-    const bowling = game === "bowling";
     const hasMoved = useStore((s) => s.hasMoved);
     // Shown once on wide screens, then tucked away a few seconds after the
     // first steps, unless the visitor opened or closed it themselves.
@@ -382,10 +380,12 @@ export const Hud = () => {
 
     return (
         <motion.div className="pointer-events-none fixed inset-0 z-10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
-            <div className="flex items-start justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:p-6">
+            {/* On phones a game's score card takes the top edge. */}
+            <div
+                className={`flex items-start justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:p-6 ${game ? "phone:hidden" : ""}`}
+            >
                 <div className="flex flex-col items-start gap-2 md:flex-row md:items-center md:gap-3">
-                    {/* Phones held sideways need the top edge for a game's score card. */}
-                    <div className={`pointer-events-auto ${game ? "[@media(max-height:520px)]:hidden" : ""}`}>
+                    <div className="pointer-events-auto">
                         <PlayerBadge />
                     </div>
                     {!game && <ModeSwitch />}
@@ -395,7 +395,7 @@ export const Hud = () => {
             </div>
             <InteractPrompt />
             {!isTouch && <ControlsHint open={!panel && !game && helpOpen} onClose={() => toggleHelp(false)} />}
-            {isTouch && !panel && !bowling && game !== "head" && <MobileControls game={game} />}
+            {isTouch && !panel && !OWN_CONTROLS.has(game) && <MobileControls game={game} />}
             <GameHud />
         </motion.div>
     );
